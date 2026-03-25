@@ -6,23 +6,40 @@ TEST(QuantumEngineTest, BellStateEntanglement) {
     // Create a 2-qubit simulator
     Simulator sim(2);
 
-    // Build the Bell State circuit: H on 0, CNOT 0 -> 1
+    // Build the Bell State circuit
     std::vector<Instruction> circuit = {
         {"H", {0}},
         {"CNOT", {0, 1}}
     };
 
-    // Run the simulation
+    // Run 
     sim.run(circuit);
 
-    // Get the resulting probabilities
+    // Get probabilities
     std::vector<double> probs = sim.get_probabilities();
 
-    // In a Bell state, indices 0 (|00>) and 3 (|11>) should be 0.5.
-    // Indices 1 (|01>) and 2 (|10>) should be 0.0.
-    // We use EXPECT_NEAR to account for minor floating-point rounding errors.
     EXPECT_NEAR(probs[0], 0.5, 1e-5);
     EXPECT_NEAR(probs[1], 0.0, 1e-5);
     EXPECT_NEAR(probs[2], 0.0, 1e-5);
     EXPECT_NEAR(probs[3], 0.5, 1e-5);
+}
+
+TEST(QuantumEngineTest, HXZSuperposition) {
+    Simulator sim(2);
+
+    std::vector<Instruction> circuit = {
+        {"H", {0}},
+        {"X", {0}},
+        {"Z", {0}},
+        {"H", {1}}
+    };
+
+    sim.run(circuit);
+
+    std::vector<double> probs = sim.get_probabilities();
+
+    EXPECT_NEAR(probs[0], 0.25, 1e-5); 
+    EXPECT_NEAR(probs[1], 0.25, 1e-5); 
+    EXPECT_NEAR(probs[2], 0.25, 1e-5); 
+    EXPECT_NEAR(probs[3], 0.25, 1e-5);
 }
