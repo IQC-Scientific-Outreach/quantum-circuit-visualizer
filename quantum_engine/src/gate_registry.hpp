@@ -2,7 +2,8 @@
 #include "types.hpp"
 #include <unordered_map>
 #include <string>
+using namespace std;
 
 namespace GateRegistry {
-    extern const std::unordered_map<std::string, Matrix2x2> base_gates;
+    extern const unordered_map<string, Matrix2x2> base_gates;
 }

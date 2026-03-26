@@ -1,5 +1,6 @@
 #include "gate_registry.hpp"
 #include <cmath> 
+using namespace std;
 
 namespace GateRegistry {
     const double inv_sqrt2 = M_SQRT1_2;
@@ -19,7 +20,7 @@ namespace GateRegistry {
         Complex(0, 0), Complex(-1, 0)
     };
     
-    const std::unordered_map<std::string, Matrix2x2> base_gates = {
+    const unordered_map<string, Matrix2x2> base_gates = {
         {"H", H},
         {"X", X},
         {"Z", Z}

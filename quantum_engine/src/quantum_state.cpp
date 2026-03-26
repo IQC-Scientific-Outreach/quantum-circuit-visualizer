@@ -1,4 +1,5 @@
 #include "quantum_state.hpp"
+using namespace std;
 
 QuantumState::QuantumState(int n) : num_qubits(n), state(1ull << n, {0.0, 0.0}) {
     state[0] = {1.0, 0.0}; 
@@ -31,11 +32,11 @@ void QuantumState::apply_cnot(int control, int target) {
     for (size_t i = 0; i < full_size; ++i) {
         if (((i & c_mask) != 0) && ((i & t_mask) == 0)) {
             size_t swap_idx = i | t_mask;
-            std::swap(state[i], state[swap_idx]);
+            swap(state[i], state[swap_idx]);
         }
     }
 }
 
-const std::vector<Complex>& QuantumState::get_state() const {
+const vector<Complex>& QuantumState::get_state() const {
     return state;
 }
