@@ -1,9 +1,127 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Play, Settings2, Plus, Trash2 } from 'lucide-react';
 import initQuantumEngine from './wasm/quantum_engine.js'
+import { draggable, dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import './App.css'
 
 const AVAILABLE_GATES = ['H', 'X', 'Y', 'Z', 'CNOT'];
+
+const GATE_STYLES = {
+  H: 'bg-blue-500/20 border-blue-500/50 text-blue-400',
+  X: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400',
+  Y: 'bg-purple-500/20 border-purple-500/50 text-purple-400',
+  Z: 'bg-amber-500/20 border-amber-500/50 text-amber-400',
+  CNOT: 'border-transparent bg-transparent text-rose-400 hover:text-rose-300'
+};
+
+const GateVisual = ({ name }) => {
+  if (name === 'CNOT') {
+    return (
+      <svg className="w-8 h-12" viewBox="0 0 24 32" fill="none" stroke="currentColor">
+        <circle cx="12" cy="6" r="3" fill="currentColor" stroke="none" />
+        <line x1="12" y1="6" x2="12" y2="21" strokeWidth="1.5" />
+        <circle cx="12" cy="26" r="5" strokeWidth="1.5" />
+        <path d="M12 21v10M7 26h10" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  return <span>{name}</span>;
+};
+
+const DraggableGate = ({ gate }) => {
+  const ref = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return draggable({
+      element: el,
+      getInitialData: () => ({ type: 'gate', name: gate }),
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+  }, [gate]);
+
+  const baseClasses = `transition-all cursor-grab flex items-center justify-center font-bold ${isDragging ? 'opacity-50' : ''}`;
+
+  if (gate === 'CNOT') {
+    return (
+      <div ref={ref} className={`${baseClasses} p-2 ${GATE_STYLES[gate]}`}>
+        <GateVisual name={gate} />
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className={`${baseClasses} w-14 h-14 border rounded-lg text-xl hover:brightness-125 hover:shadow-lg ${GATE_STYLES[gate]}`}>
+      <GateVisual name={gate} />
+    </div>
+  );
+};
+
+
+const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
+  const ref = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return draggable({
+      element: el,
+      getInitialData: () => ({ 
+        type: 'cnot-node', 
+        role: cell.role, 
+        wireIndex, 
+        stepIndex, 
+        peerWire: cell.role === 'control' ? cell.targetWire : cell.controlWire 
+      }),
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+  }, [cell, wireIndex, stepIndex]);
+
+  const baseClasses = `absolute w-full h-full flex items-center justify-center cursor-grab hover:scale-110 transition-transform z-20 ${isDragging ? 'opacity-0' : ''}`;
+
+  return (
+    <div ref={ref} className={baseClasses}>
+      {cell.role === 'control' && <div className="w-4 h-4 rounded-full bg-rose-400" />}
+      {cell.role === 'target' && (
+        <svg className="w-8 h-8 text-rose-400 bg-slate-950 rounded-full" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="10" strokeWidth="2" />
+          <path d="M12 2v20M2 12h20" strokeWidth="2" />
+        </svg>
+      )}
+    </div>
+  );
+};
+
+const DropZone = ({ wireIndex, stepIndex }) => {
+  const ref = useRef(null);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return dropTargetForElements({
+      element: el,
+      getData: () => ({ type: 'slot', wireIndex, stepIndex }),
+      onDragEnter: () => setIsHovered(true),
+      onDragLeave: () => setIsHovered(false),
+      onDrop: () => setIsHovered(false),
+    });
+  }, [wireIndex, stepIndex]);
+
+  return (
+    <div 
+      ref={ref} 
+      className={`w-full h-full border-2 rounded transition-colors ${
+        isHovered ? 'border-blue-500 bg-blue-500/20' : 'border-transparent hover:border-slate-700 border-dashed'
+      }`}
+    />
+  );
+};
 
 function App() {
   const [circuit, setCircuit] = useState([
@@ -39,6 +157,65 @@ function App() {
       );
     }
   }, [circuit]);
+
+useEffect(() => {
+  return monitorForElements({
+    onDrop({ source, location }) {
+      const destination = location.current.dropTargets[0];
+      if (!destination) return; 
+
+      const gateData = source.data;
+      const slotData = destination.data;
+
+      if (gateData.type === 'gate' && slotData.type === 'slot') {
+        setCircuit(prev => {
+          const newCircuit = prev.map(wire => [...wire]);
+          if (gateData.name === 'CNOT') {
+            const cIndex = slotData.wireIndex;
+            const tIndex = cIndex < prev.length - 1 ? cIndex + 1 : cIndex - 1;
+
+            newCircuit[cIndex][slotData.stepIndex] = { 
+              name: 'CNOT', role: 'control', targetWire: tIndex 
+            };
+
+            newCircuit[tIndex][slotData.stepIndex] = { 
+              name: 'CNOT', role: 'target', controlWire: cIndex 
+            };
+          } else {
+            newCircuit[slotData.wireIndex][slotData.stepIndex] = { name: gateData.name };
+          }
+          
+          return newCircuit;
+        });
+      }
+
+      if (gateData.type === 'cnot-node' && slotData.type === 'slot') {
+        setCircuit(prev => {
+          const newCircuit = prev.map(wire => [...wire]);
+          const { role, wireIndex: oldWire, stepIndex: oldStep, peerWire } = gateData;
+          const newWire = slotData.wireIndex;
+          const newStep = slotData.stepIndex;
+
+          if (newWire === peerWire && newStep === oldStep) return prev;
+          if (newStep !== oldStep) return prev; 
+          newCircuit[oldWire][oldStep] = null;
+          newCircuit[newWire][newStep] = {
+            name: 'CNOT',
+            role: role,
+            [role === 'control' ? 'targetWire' : 'controlWire']: peerWire
+          };
+          newCircuit[peerWire][oldStep] = {
+            name: 'CNOT',
+            role: role === 'control' ? 'target' : 'control',
+            [role === 'control' ? 'controlWire' : 'targetWire']: newWire
+          };
+
+          return newCircuit;
+        });
+        }
+    }
+  });
+}, []);
 
   const addQubit = () => {
     const numSteps = circuit[0].length;
@@ -156,11 +333,9 @@ function App() {
         
         <aside className="w-64 bg-slate-900 border-r border-slate-800 p-6 flex flex-col gap-6 z-10 shrink-0">
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gates</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4 items-center justify-items-center">
             {AVAILABLE_GATES.map((gate) => (
-              <div key={gate} className="bg-slate-800 border border-slate-700 text-slate-300 h-12 rounded flex items-center justify-center font-bold text-lg cursor-grab hover:bg-slate-700 hover:text-white transition-colors">
-                {gate}
-              </div>
+              <DraggableGate key={gate} gate={gate} />
             ))}
           </div>
         </aside>
@@ -180,11 +355,28 @@ function App() {
                     <div key={`slot-${wireIndex}-${stepIndex}`} className="w-14 h-14 relative flex items-center justify-center mx-1 z-10">
                       
                       {cell ? (
-                         <div className="w-full h-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 rounded flex items-center justify-center font-bold text-lg shadow-sm backdrop-blur-sm">
-                           {cell.name}
-                         </div>
+                        cell.name === 'CNOT' ? (
+                          <div className="w-full h-full relative flex items-center justify-center z-20">
+                            <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
+                            {cell.role === 'control' && (
+                              <div
+                                className="absolute w-[2px] bg-rose-400 z-0 pointer-events-none"
+                                style={{
+                                  left: 'calc(50% - 1px)',
+                                  top: cell.targetWire > wireIndex ? '50%' : 'auto',
+                                  bottom: cell.targetWire < wireIndex ? '50%' : 'auto',
+                                  height: `${Math.abs(cell.targetWire - wireIndex) * 80}px`
+                                }}
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <div className={`w-full h-full border text-lg rounded flex items-center justify-center font-bold shadow-sm backdrop-blur-sm ${GATE_STYLES[cell.name]}`}>
+                            <GateVisual name={cell.name} />
+                          </div>
+                        )
                       ) : (
-                         <div className="w-full h-full border-2 border-transparent hover:border-slate-700 border-dashed rounded transition-colors"></div>
+                        <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />
                       )}
 
                     </div>
