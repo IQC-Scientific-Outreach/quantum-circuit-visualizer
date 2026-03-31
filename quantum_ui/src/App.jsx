@@ -247,67 +247,62 @@ useEffect(() => {
     LoadEngine()
   }, [])
 
-  const runTestCircuit = () => {
-    if (!engine) return
-    const sim = new engine.Simulator(2)
-    const cppCircuit = new engine.VectorInstruction()
-    const jsCircuit = [
-      {name: 'X', qubits: [0]},
-      {name: 'H', qubits: [0]},
-      {name: 'H', qubits: [1]},
-      {name: 'CNOT', qubits: [0, 1]},
-      {name: 'H', qubits: [0]},
-      {name: 'H', qubits: [1]}
-    ]
+  const runCircuit = () => {
+    if (!engine) return;
 
-    const jsCircuit2 = [
-      {name: 'X', qubits: [0]},
-      {name: 'Z', qubits: [0]},
-      {name: 'H', qubits: [0]},
-      {name: 'CNOT', qubits: [0, 1]},
-    ]
+    const numQubits = circuit.length;
+    const sim = new engine.Simulator(numQubits);
+    const cppCircuit = new engine.VectorInstruction();
 
-    jsCircuit.forEach(inst => {
-      // C++ vector for the ints
-      const cppQubits = new engine.VectorInt()
-      
-      // Push JS numbers to the C++ vector
-      inst.qubits.forEach(q => cppQubits.push_back(q))
-      
-      cppCircuit.push_back({
-        name: inst.name,
-        qubits: cppQubits
-      })
-      
-      cppQubits.delete()
-    })
+    const compiledInstructions = [];
+    const numSteps = circuit[0].length;
+
+    for (let step = 0; step < numSteps; step++) {
+      for (let wire = 0; wire < numQubits; wire++) {
+        const cell = circuit[wire][step];
+        if (!cell) continue;
+
+        if (cell.name === 'CNOT') {
+          if (cell.role === 'control') {
+            compiledInstructions.push({ name: 'CNOT', qubits: [wire, cell.targetWire] });
+          }
+        } else {
+          compiledInstructions.push({ name: cell.name, qubits: [wire] });
+        }
+      }
+    }
+
+    compiledInstructions.forEach(inst => {
+      const cppQubits = new engine.VectorInt();
+      inst.qubits.forEach(q => cppQubits.push_back(q));
+      cppCircuit.push_back({ name: inst.name, qubits: cppQubits });
+      cppQubits.delete();
+    });
     
-    sim.run(cppCircuit)
-    const cppProb = sim.get_probabilities()
+    sim.run(cppCircuit);
 
-    const probArr = []
+    const cppProb = sim.get_probabilities();
+    const probArr = [];
     for (let i = 0; i < cppProb.size(); i++) {
-      probArr.push(cppProb.get(i))
+      probArr.push(cppProb.get(i));
     }
+    setProbabilities(probArr);
 
-    setProbabilities(probArr)
-
-    const cppState = sim.get_statevector()
-    const stateArr = []
+    const cppState = sim.get_statevector();
+    const stateArr = [];
     for (let i = 0; i < cppState.size(); i += 2) {
-      const real = cppState.get(i)
-      const imag = cppState.get(i + 1)
-      const sign = imag >= 0 ? '+' : '-'
-      const formattedAmplitude = `${real.toFixed(4)} ${sign} ${Math.abs(imag).toFixed(4)}i`
-      stateArr.push(formattedAmplitude)
+      const real = cppState.get(i);
+      const imag = cppState.get(i + 1);
+      const sign = imag >= 0 ? '+' : '-';
+      stateArr.push(`${real.toFixed(4)} ${sign} ${Math.abs(imag).toFixed(4)}i`);
     }
+    setStateVector(stateArr);
 
-    setStateVector(stateArr)
-
-    sim.delete()
-    cppCircuit.delete()
-    cppProb.delete()
-  } 
+    sim.delete();
+    cppCircuit.delete();
+    cppProb.delete();
+    cppState.delete();
+  }; 
 
   return (
     <div className="fixed inset-0 flex flex-col font-sans text-slate-300 bg-slate-950">
@@ -318,7 +313,7 @@ useEffect(() => {
           <h1 className="text-xl font-bold tracking-tight text-white">Quantum Circuit Visualizer</h1>
         </div>
         <button 
-          onClick={runTestCircuit}
+          onClick={runCircuit}
           disabled={!isReady}
           className={`px-4 py-2 rounded-md font-semibold flex items-center gap-2 transition-colors ${
             isReady ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
