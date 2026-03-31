@@ -64,11 +64,13 @@ const DraggableGate = ({ gate }) => {
 const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
   const ref = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false); 
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    return draggable({
+    
+    const cleanupDrag = draggable({
       element: el,
       getInitialData: () => ({ 
         type: 'cnot-node', 
@@ -80,9 +82,22 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
       onDragStart: () => setIsDragging(true),
       onDrop: () => setIsDragging(false),
     });
+
+    const cleanupDrop = dropTargetForElements({
+      element: el,
+      getData: () => ({ type: 'cnot-partner', wireIndex, stepIndex }),
+      onDragEnter: () => setIsHovered(true),
+      onDragLeave: () => setIsHovered(false),
+      onDrop: () => setIsHovered(false),
+    });
+
+    return () => {
+      cleanupDrag();
+      cleanupDrop();
+    };
   }, [cell, wireIndex, stepIndex]);
 
-  const baseClasses = `absolute w-full h-full flex items-center justify-center cursor-grab hover:scale-110 transition-transform z-20 ${isDragging ? 'opacity-0' : ''}`;
+  const baseClasses = `absolute w-full h-full flex items-center justify-center cursor-grab hover:scale-110 transition-all z-20 ${isDragging ? 'opacity-0' : ''} ${isHovered ? 'bg-blue-500/30 rounded-lg scale-110' : ''}`;
 
   return (
     <div ref={ref} className={baseClasses}>
@@ -93,6 +108,53 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
           <path d="M12 2v20M2 12h20" strokeWidth="2" />
         </svg>
       )}
+    </div>
+  );
+};
+
+const DraggablePlacedGate = ({ cell, wireIndex, stepIndex, handleRightClickDelete }) => {
+  const ref = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isInsertHovered, setIsInsertHovered] = useState(false); 
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const cleanupDrag = draggable({
+      element: el,
+      getInitialData: () => ({ type: 'placed-gate', name: cell.name, wireIndex, stepIndex }),
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+
+    const cleanupDrop = dropTargetForElements({
+      element: el,
+      getData: () => ({ type: 'gate-insert', wireIndex, stepIndex }),
+      onDragEnter: () => setIsInsertHovered(true),
+      onDragLeave: () => setIsInsertHovered(false),
+      onDrop: () => setIsInsertHovered(false),
+    });
+
+    return () => {
+      cleanupDrag();
+      cleanupDrop();
+    };
+  }, [cell, wireIndex, stepIndex]);
+
+  const baseClasses = `w-full h-full border text-lg rounded flex items-center justify-center font-bold shadow-sm backdrop-blur-sm cursor-grab transition-all z-20 
+    ${isDragging ? 'opacity-50' : 'hover:brightness-125'} 
+    ${isInsertHovered ? 'border-l-4 border-l-blue-400 scale-105 shadow-blue-500/50' : ''} 
+    ${GATE_STYLES[cell.name]}`;
+
+  return (
+    <div 
+      ref={ref}
+      className={baseClasses}
+      onContextMenu={(e) => handleRightClickDelete(e, wireIndex, stepIndex)}
+      title="Drag to move, Right-click to delete"
+    >
+      <GateVisual name={cell.name} />
     </div>
   );
 };
@@ -123,6 +185,47 @@ const DropZone = ({ wireIndex, stepIndex }) => {
   );
 };
 
+const compactCircuit = (oldCircuit) => {
+  const numWires = oldCircuit.length;
+  const numSteps = oldCircuit[0].length;
+
+  const newCircuit = Array.from({ length: numWires }, () => Array(numSteps).fill(null));
+
+  const tail = Array(numWires).fill(-1);
+  const processedCNOTs = new Set(); 
+
+  for (let step = 0; step < numSteps; step++) {
+    for (let wire = 0; wire < numWires; wire++) {
+      const cell = oldCircuit[wire][step];
+      if (!cell) continue;
+
+      if (cell.name === 'CNOT') {
+        const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
+        
+        const cnotId = `${Math.min(wire, peerWire)}-${Math.max(wire, peerWire)}-${step}`;
+        if (processedCNOTs.has(cnotId)) continue;
+        processedCNOTs.add(cnotId);
+
+        const targetStep = Math.max(tail[wire], tail[peerWire]) + 1;
+
+        newCircuit[wire][targetStep] = { ...cell };
+        newCircuit[peerWire][targetStep] = { ...oldCircuit[peerWire][step] };
+        
+        tail[wire] = targetStep;
+        tail[peerWire] = targetStep;
+
+      } else {
+        const targetStep = tail[wire] + 1;
+        
+        newCircuit[wire][targetStep] = { ...cell };
+        tail[wire] = targetStep; 
+      }
+    }
+  }
+
+  return newCircuit;
+};
+
 function App() {
   const [circuit, setCircuit] = useState([
     [null, null, null, null],
@@ -150,10 +253,15 @@ function App() {
     const desiredLength = Math.max(5, highestOccupiedIndex + 5);
     const currentLength = circuit[0].length;
 
-    if (currentLength < desiredLength) {
-      const difference = desiredLength - currentLength;
+    if (currentLength !== desiredLength) {
       setCircuit(prevCircuit => 
-        prevCircuit.map(wire => [...wire, ...Array(difference).fill(null)])
+        prevCircuit.map(wire => {
+          if (currentLength < desiredLength) {
+            return [...wire, ...Array(desiredLength - currentLength).fill(null)];
+          } else {
+            return wire.slice(0, desiredLength);
+          }
+        })
       );
     }
   }, [circuit]);
@@ -185,8 +293,33 @@ useEffect(() => {
             newCircuit[slotData.wireIndex][slotData.stepIndex] = { name: gateData.name };
           }
           
-          return newCircuit;
+          return compactCircuit(newCircuit);
         });
+      }
+      if (gateData.type === 'cnot-node' && slotData.type === 'cnot-partner') {
+        setCircuit(prev => {
+          const newCircuit = prev.map(wire => [...wire]);
+          const oldWire = gateData.wireIndex;
+          const peerWire = gateData.peerWire;
+          const step = gateData.stepIndex;
+
+          if (slotData.wireIndex === peerWire && slotData.stepIndex === step) {
+            
+            newCircuit[oldWire][step] = {
+              name: 'CNOT',
+              role: gateData.role === 'control' ? 'target' : 'control',
+              [gateData.role === 'control' ? 'controlWire' : 'targetWire']: peerWire
+            };
+
+            newCircuit[peerWire][step] = {
+              name: 'CNOT',
+              role: gateData.role,
+              [gateData.role === 'control' ? 'targetWire' : 'controlWire']: oldWire
+            };
+          }
+          return compactCircuit(newCircuit);
+        });
+        return; 
       }
 
       if (gateData.type === 'cnot-node' && slotData.type === 'slot') {
@@ -210,8 +343,67 @@ useEffect(() => {
             [role === 'control' ? 'controlWire' : 'targetWire']: newWire
           };
 
-          return newCircuit;
+          return compactCircuit(newCircuit);
         });
+        }
+
+        if (gateData.type === 'placed-gate' && slotData.type === 'slot') {
+          setCircuit(prev => {
+            const newCircuit = prev.map(wire => [...wire]);
+            const { wireIndex: oldWire, stepIndex: oldStep, name } = gateData;
+            const newWire = slotData.wireIndex;
+            const newStep = slotData.stepIndex;
+
+            if (oldWire === newWire && oldStep === newStep) return prev;
+
+            newCircuit[oldWire][oldStep] = null;
+            
+            newCircuit[newWire][newStep] = { name };
+
+            return compactCircuit(newCircuit);
+          });
+        }
+
+        if (slotData.type === 'gate-insert') {
+          setCircuit(prev => {
+            let newCircuit = prev.map(wire => [...wire]);
+            const insertStep = slotData.stepIndex;
+            const targetWire = slotData.wireIndex;
+
+            if (gateData.type === 'placed-gate') {
+              newCircuit[gateData.wireIndex][gateData.stepIndex] = null;
+            } else if (gateData.type === 'cnot-node') {
+              newCircuit[gateData.wireIndex][gateData.stepIndex] = null;
+              newCircuit[gateData.peerWire][gateData.stepIndex] = null;
+            }
+
+            newCircuit = newCircuit.map(wire => {
+              const newWire = [...wire];
+              newWire.splice(insertStep, 0, null);
+              return newWire;
+            });
+
+            if (gateData.type === 'gate') {
+              if (gateData.name === 'CNOT') {
+                const tIndex = targetWire < prev.length - 1 ? targetWire + 1 : targetWire - 1;
+                newCircuit[targetWire][insertStep] = { name: 'CNOT', role: 'control', targetWire: tIndex };
+                newCircuit[tIndex][insertStep] = { name: 'CNOT', role: 'target', controlWire: targetWire };
+              } else {
+                newCircuit[targetWire][insertStep] = { name: gateData.name };
+              }
+            } else if (gateData.type === 'placed-gate') {
+              newCircuit[targetWire][insertStep] = { name: gateData.name };
+            } else if (gateData.type === 'cnot-node') {
+              newCircuit[targetWire][insertStep] = { 
+                name: 'CNOT', role: gateData.role, [gateData.role === 'control' ? 'targetWire' : 'controlWire']: gateData.peerWire 
+              };
+              newCircuit[gateData.peerWire][insertStep] = { 
+                name: 'CNOT', role: gateData.role === 'control' ? 'target' : 'control', [gateData.role === 'control' ? 'controlWire' : 'targetWire']: targetWire 
+              };
+            }
+            return compactCircuit(newCircuit);
+          });
+          return;
         }
     }
   });
@@ -226,6 +418,27 @@ useEffect(() => {
   const removeQubit = (indexToRemove) => {
     if (circuit.length <= 1) return; // Prevent deleting the very last wire
     setCircuit(circuit.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleRightClickDelete = (e, wireIndex, stepIndex) => {
+    e.preventDefault();
+
+    setCircuit(prev => {
+      const newCircuit = prev.map(wire => [...wire]);
+      const cell = newCircuit[wireIndex][stepIndex];
+
+      if (!cell) return prev;
+
+      if (cell.name === 'CNOT') {
+        const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
+        newCircuit[wireIndex][stepIndex] = null;
+        newCircuit[peerWire][stepIndex] = null;
+      } else {
+        newCircuit[wireIndex][stepIndex] = null;
+      }
+
+      return compactCircuit(newCircuit);
+    });
   };
 
   const addTimeStep = () => {
@@ -351,10 +564,14 @@ useEffect(() => {
                       
                       {cell ? (
                         cell.name === 'CNOT' ? (
-                          <div className="w-full h-full relative flex items-center justify-center z-20">
+                          <div 
+                            className="w-full h-full relative flex items-center justify-center z-20"
+                            onContextMenu={(e) => handleRightClickDelete(e, wireIndex, stepIndex)}
+                          >
                             <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
+                            
                             {cell.role === 'control' && (
-                              <div
+                              <div 
                                 className="absolute w-[2px] bg-rose-400 z-0 pointer-events-none"
                                 style={{
                                   left: 'calc(50% - 1px)',
@@ -366,9 +583,12 @@ useEffect(() => {
                             )}
                           </div>
                         ) : (
-                          <div className={`w-full h-full border text-lg rounded flex items-center justify-center font-bold shadow-sm backdrop-blur-sm ${GATE_STYLES[cell.name]}`}>
-                            <GateVisual name={cell.name} />
-                          </div>
+                          <DraggablePlacedGate 
+                            cell={cell} 
+                            wireIndex={wireIndex} 
+                            stepIndex={stepIndex} 
+                            handleRightClickDelete={handleRightClickDelete} 
+                          />
                         )
                       ) : (
                         <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />
