@@ -584,7 +584,7 @@ useEffect(() => {
                                   left: 'calc(50% - 1px)',
                                   top: cell.targetWire > wireIndex ? '50%' : 'auto',
                                   bottom: cell.targetWire < wireIndex ? '50%' : 'auto',
-                                  height: `${Math.abs(cell.targetWire - wireIndex) * 80}px`
+                                  height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem`
                                 }}
                               />
                             )}
