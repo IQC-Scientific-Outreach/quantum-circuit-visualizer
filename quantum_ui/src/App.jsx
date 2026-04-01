@@ -201,18 +201,26 @@ const compactCircuit = (oldCircuit) => {
 
       if (cell.name === 'CNOT') {
         const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
-        
+
         const cnotId = `${Math.min(wire, peerWire)}-${Math.max(wire, peerWire)}-${step}`;
         if (processedCNOTs.has(cnotId)) continue;
         processedCNOTs.add(cnotId);
 
-        const targetStep = Math.max(tail[wire], tail[peerWire]) + 1;
+        const minWire = Math.min(wire, peerWire);
+        const maxWire = Math.max(wire, peerWire);
 
+        let maxTail = -1;
+        for (let w = minWire; w <= maxWire; w++) {
+          if (tail[w] > maxTail) maxTail = tail[w];
+        }
+
+        const targetStep = maxTail + 1;
         newCircuit[wire][targetStep] = { ...cell };
         newCircuit[peerWire][targetStep] = { ...oldCircuit[peerWire][step] };
-        
-        tail[wire] = targetStep;
-        tail[peerWire] = targetStep;
+
+        for (let w = minWire; w <= maxWire; w++) {
+          tail[w] = targetStep;
+        }
 
       } else {
         const targetStep = tail[wire] + 1;
