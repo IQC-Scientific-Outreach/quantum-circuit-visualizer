@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Play, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Trash2 } from 'lucide-react';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 
 import initQuantumEngine from './wasm/quantum_engine.js'
@@ -26,6 +26,100 @@ function App() {
   
   const [shots, setShots] = useState(100);
   const [shotResults, setShotResults] = useState([]);
+
+  const [measureStep, setMeasureStep] = useState(null);
+
+  // ---------------------------------------------------------------------------
+  // WASM engine
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    async function loadEngine() {
+      try {
+        const Module = await initQuantumEngine();
+        setEngine(Module);
+        setIsReady(true);
+      } catch (err) {
+        console.error('Failed to load WASM:', err);
+      }
+    }
+    loadEngine();
+  }, []);
+
+  const runCircuit = useCallback((targetStep = null) => {
+    if (!engine) return;
+
+    const numQubits = circuit.length;
+    const sim = new engine.Simulator(numQubits);
+    const cppCircuit = new engine.VectorInstruction();
+
+    const compiledInstructions = [];
+
+    const maxStep = targetStep !== null ? targetStep : circuit[0].length - 1;
+
+    for (let step = 0; step <= maxStep; step++) {
+      for (let wire = 0; wire < numQubits; wire++) {
+        const cell = circuit[wire][step];
+        if (!cell) continue;
+
+        if (cell.name === 'CNOT') {
+          if (cell.role === 'control') {
+            compiledInstructions.push({ name: 'CNOT', qubits: [wire, cell.targetWire] });
+          }
+        } else {
+          compiledInstructions.push({ name: cell.name, qubits: [wire] });
+        }
+      }
+    }
+
+    compiledInstructions.forEach(inst => {
+      const cppQubits = new engine.VectorInt();
+      inst.qubits.forEach(q => cppQubits.push_back(q));
+      cppCircuit.push_back({ name: inst.name, qubits: cppQubits });
+      cppQubits.delete();
+    });
+
+    sim.run(cppCircuit);
+
+    const cppProb = sim.get_probabilities();
+    const probArr = [];
+    const events = [];
+    
+    for (let i = 0; i < cppProb.size(); i++) {
+      probArr.push(cppProb.get(i));
+      events.push(i.toString(2).padStart(numQubits, '0'));
+    }
+    setProbabilities(probArr);
+
+    const numShots = parseInt(shots, 10) || 100;
+    const rawCounts = simulateShots(events, probArr, numShots);
+    
+    const chartData = events.map(state => ({
+      state: `|${state}⟩`,
+      count: rawCounts[state]
+    }));
+    setShotResults(chartData);
+
+    const cppState = sim.get_statevector();
+    const stateArr = [];
+    for (let i = 0; i < cppState.size(); i += 2) {
+      const real = cppState.get(i);
+      const imag = cppState.get(i + 1);
+      const sign = imag >= 0 ? '+' : '-';
+      stateArr.push(`${real.toFixed(4)} ${sign} ${Math.abs(imag).toFixed(4)}i`);
+    }
+    setStateVector(stateArr);
+
+    sim.delete();
+    cppCircuit.delete();
+    cppProb.delete();
+    cppState.delete();
+  }, [circuit, engine, shots]);
+
+  useEffect(() => {
+    if (isReady && engine) {
+      runCircuit(measureStep);
+    }
+  }, [measureStep, circuit, shots, isReady, engine, runCircuit]);
 
   // ---------------------------------------------------------------------------
   // Auto-resize: keep at least 5 empty columns past the last occupied step
@@ -69,7 +163,6 @@ function App() {
         const gateData = source.data;
         const slotData = destination.data;
 
-        // --- New gate from palette → empty slot ---
         if (gateData.type === 'gate' && slotData.type === 'slot') {
           setCircuit(prev => {
             const newCircuit = prev.map(wire => [...wire]);
@@ -86,7 +179,6 @@ function App() {
           return;
         }
 
-        // --- Move a CNOT node to a different wire (same step only) ---
         if (gateData.type === 'cnot-node' && slotData.type === 'slot') {
           setCircuit(prev => {
             const newCircuit = prev.map(wire => [...wire]);
@@ -95,7 +187,7 @@ function App() {
             const newStep = slotData.stepIndex;
 
             if (newWire === peerWire && newStep === oldStep) return prev;
-            if (newStep !== oldStep) return prev; // cross-step moves not supported
+            if (newStep !== oldStep) return prev; 
 
             newCircuit[oldWire][oldStep] = null;
             newCircuit[newWire][newStep] = {
@@ -114,7 +206,6 @@ function App() {
           return;
         }
 
-        // --- Move a placed (non-CNOT) gate to an empty slot ---
         if (gateData.type === 'placed-gate' && slotData.type === 'slot') {
           setCircuit(prev => {
             const newCircuit = prev.map(wire => [...wire]);
@@ -132,14 +223,12 @@ function App() {
           return;
         }
 
-        // --- Swap control ↔ target on a CNOT ---
         const isCnotSwap =
           gateData.type === 'cnot-node' &&
           slotData.type === 'cnot-node-drop' &&
           slotData.wireIndex === gateData.peerWire &&
           slotData.stepIndex === gateData.stepIndex;
 
-        // --- Insert-before: dropping onto an occupied gate cell ---
         const isInsert =
           slotData.type === 'gate-insert' ||
           (slotData.type === 'cnot-node-drop' && !isCnotSwap);
@@ -172,7 +261,6 @@ function App() {
             const insertStep = slotData.stepIndex;
             const targetWire = slotData.wireIndex;
 
-            // Clear the source position(s) before splicing
             if (gateData.type === 'placed-gate') {
               newCircuit[gateData.wireIndex][gateData.stepIndex] = null;
             } else if (gateData.type === 'cnot-node') {
@@ -180,14 +268,12 @@ function App() {
               newCircuit[gateData.peerWire][gateData.stepIndex] = null;
             }
 
-            // Insert a blank column at the target step
             newCircuit = newCircuit.map(wire => {
               const newWire = [...wire];
               newWire.splice(insertStep, 0, null);
               return newWire;
             });
 
-            // Place the dragged gate at the newly created column
             if (gateData.type === 'gate') {
               if (gateData.name === 'CNOT') {
                 const tIndex = targetWire < prev.length - 1 ? targetWire + 1 : targetWire - 1;
@@ -251,91 +337,6 @@ function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // WASM engine
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    async function loadEngine() {
-      try {
-        const Module = await initQuantumEngine();
-        setEngine(Module);
-        setIsReady(true);
-      } catch (err) {
-        console.error('Failed to load WASM:', err);
-      }
-    }
-    loadEngine();
-  }, []);
-
-  const runCircuit = () => {
-    if (!engine) return;
-
-    const numQubits = circuit.length;
-    const sim = new engine.Simulator(numQubits);
-    const cppCircuit = new engine.VectorInstruction();
-
-    const compiledInstructions = [];
-    const numSteps = circuit[0].length;
-
-    for (let step = 0; step < numSteps; step++) {
-      for (let wire = 0; wire < numQubits; wire++) {
-        const cell = circuit[wire][step];
-        if (!cell) continue;
-
-        if (cell.name === 'CNOT') {
-          if (cell.role === 'control') {
-            compiledInstructions.push({ name: 'CNOT', qubits: [wire, cell.targetWire] });
-          }
-        } else {
-          compiledInstructions.push({ name: cell.name, qubits: [wire] });
-        }
-      }
-    }
-
-    compiledInstructions.forEach(inst => {
-      const cppQubits = new engine.VectorInt();
-      inst.qubits.forEach(q => cppQubits.push_back(q));
-      cppCircuit.push_back({ name: inst.name, qubits: cppQubits });
-      cppQubits.delete();
-    });
-
-    sim.run(cppCircuit);
-
-    const cppProb = sim.get_probabilities();
-    const probArr = [];
-    const events = [];
-    
-    for (let i = 0; i < cppProb.size(); i++) {
-      probArr.push(cppProb.get(i));
-      events.push(i.toString(2).padStart(numQubits, '0'));
-    }
-    setProbabilities(probArr);
-
-    const numShots = parseInt(shots, 10) || 100;
-    const rawCounts = simulateShots(events, probArr, numShots);
-    
-    const chartData = events.map(state => ({
-      state: `|${state}⟩`,
-      count: rawCounts[state]
-    }));
-    setShotResults(chartData);
-
-    const cppState = sim.get_statevector();
-    const stateArr = [];
-    for (let i = 0; i < cppState.size(); i += 2) {
-      const real = cppState.get(i);
-      const imag = cppState.get(i + 1);
-      const sign = imag >= 0 ? '+' : '-';
-      stateArr.push(`${real.toFixed(4)} ${sign} ${Math.abs(imag).toFixed(4)}i`);
-    }
-    setStateVector(stateArr);
-
-    sim.delete();
-    cppCircuit.delete();
-    cppProb.delete();
-    cppState.delete();
-  };
-
-  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
@@ -357,22 +358,16 @@ function App() {
               max="100000"
             />
           </div>
-          <button
-            onClick={runCircuit}
-            disabled={!isReady}
-            className={`px-4 py-2 rounded-md font-semibold flex items-center gap-2 transition-colors ${
-              isReady ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            <Play size={18} />
-            {isReady ? 'Run Circuit' : 'Loading Engine...'}
-          </button>
+          {!isReady && (
+            <div className="text-sm text-amber-500 font-medium animate-pulse">
+              Initializing Engine...
+            </div>
+          )}
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Sidebar: gate palette */}
         <aside className="w-64 bg-slate-900 border-r border-slate-800 p-6 flex flex-col gap-6 z-10 shrink-0">
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gates</h2>
           <div className="grid grid-cols-2 gap-4 items-center justify-items-center">
@@ -382,10 +377,37 @@ function App() {
           </div>
         </aside>
 
-        {/* Main canvas */}
         <main className="flex-1 p-8 overflow-auto flex flex-col gap-8 bg-slate-950">
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-8 inline-block min-w-max self-start">
+
+          <div className="flex items-center mb-4">
+              <div className="w-16 text-xs text-slate-500 font-bold uppercase tracking-wider text-right pr-4">Time</div>
+              
+              <div className="flex relative items-center py-2 px-9">
+                {circuit[0]?.map((_, stepIndex) => (
+                  <div
+                    key={`time-${stepIndex}`}
+                    onClick={() => setMeasureStep(measureStep === stepIndex ? null : stepIndex)}
+                    className="w-14 h-6 relative flex items-center justify-center mx-1 z-30 cursor-pointer group/timeline"
+                    title={measureStep === stepIndex ? "Clear Scrubber" : `Measure at Step ${stepIndex}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full border-2 transition-all ${
+                      measureStep === stepIndex
+                        ? 'bg-purple-500 border-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.5)] scale-125'
+                        : 'bg-slate-800 border-slate-600 group-hover/timeline:bg-slate-700'
+                    }`} />
+
+                    {measureStep === stepIndex && (
+                      <div
+                        className="absolute top-5 left-1/2 w-[2px] bg-purple-500/50 -translate-x-1/2 pointer-events-none"
+                        style={{ height: `${circuit.length * 5}rem` }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {circuit.map((wire, wireIndex) => (
               <div key={`wire-${wireIndex}`} className="flex items-center mb-2 group">
@@ -393,7 +415,6 @@ function App() {
                 <div className="w-16 font-mono text-slate-500 font-medium">q[{wireIndex}]</div>
 
                 <div className="flex relative items-center py-2 px-1">
-                  {/* Qubit wire line */}
                   <div className="absolute left-0 right-0 h-[2px] bg-slate-700 z-0" />
 
                   {wire.map((cell, stepIndex) => (
@@ -409,7 +430,6 @@ function App() {
                           >
                             <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
 
-                            {/* Vertical line connecting control to target */}
                             {cell.role === 'control' && (
                               <div
                                 className="absolute w-[2px] bg-rose-400 z-0 pointer-events-none"
@@ -457,11 +477,9 @@ function App() {
             </div>
           </div>
 
-          {/* Results panels */}
           {(probabilities.length > 0 || stateVector.length > 0) && (
             <div className="flex flex-col gap-6 self-start min-w-[600px] w-full max-w-5xl">
               
-              {/* Inserted modular Histogram component */}
               <MeasurementHistogram data={shotResults} shots={shots} />
 
               <div className="grid grid-cols-2 gap-6 items-start">
