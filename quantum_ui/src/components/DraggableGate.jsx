@@ -1,0 +1,45 @@
+import { useRef, useEffect, useState } from 'react';
+import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import GateVisual from './GateVisual';
+import { GATE_STYLES } from '../constants';
+
+/**
+ * A draggable gate tile shown in the sidebar palette.
+ * Dragging one of these onto a DropZone places a new gate.
+ */
+const DraggableGate = ({ gate }) => {
+  const ref = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return draggable({
+      element: el,
+      getInitialData: () => ({ type: 'gate', name: gate }),
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+  }, [gate]);
+
+  const baseClasses = `transition-all cursor-grab flex items-center justify-center font-bold ${isDragging ? 'opacity-50' : ''}`;
+
+  if (gate === 'CNOT') {
+    return (
+      <div ref={ref} className={`${baseClasses} p-2 ${GATE_STYLES[gate]}`}>
+        <GateVisual name={gate} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={`${baseClasses} w-14 h-14 border rounded-lg text-xl hover:brightness-125 hover:shadow-lg ${GATE_STYLES[gate]}`}
+    >
+      <GateVisual name={gate} />
+    </div>
+  );
+};
+
+export default DraggableGate;
