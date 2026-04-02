@@ -60,11 +60,11 @@ const DraggableGate = ({ gate }) => {
   );
 };
 
-
 const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
   const ref = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isHovered, setIsHovered] = useState(false); 
+  const [isPartnerHovered, setIsPartnerHovered] = useState(false);
+  const [isInsertHovered, setIsInsertHovered] = useState(false); 
 
   useEffect(() => {
     const el = ref.current;
@@ -85,10 +85,24 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
 
     const cleanupDrop = dropTargetForElements({
       element: el,
-      getData: () => ({ type: 'cnot-partner', wireIndex, stepIndex }),
-      onDragEnter: () => setIsHovered(true),
-      onDragLeave: () => setIsHovered(false),
-      onDrop: () => setIsHovered(false),
+      getData: () => ({ type: 'cnot-node-drop', wireIndex, stepIndex }),
+      onDragEnter: ({ source }) => {
+        if (source.data.type === 'cnot-node' && 
+            source.data.peerWire === wireIndex && 
+            source.data.stepIndex === stepIndex) {
+          setIsPartnerHovered(true);
+        } else {
+          setIsInsertHovered(true);
+        }
+      },
+      onDragLeave: () => {
+        setIsPartnerHovered(false);
+        setIsInsertHovered(false);
+      },
+      onDrop: () => {
+        setIsPartnerHovered(false);
+        setIsInsertHovered(false);
+      },
     });
 
     return () => {
@@ -97,7 +111,10 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
     };
   }, [cell, wireIndex, stepIndex]);
 
-  const baseClasses = `absolute w-full h-full flex items-center justify-center cursor-grab hover:scale-110 transition-all z-20 ${isDragging ? 'opacity-0' : ''} ${isHovered ? 'bg-blue-500/30 rounded-lg scale-110' : ''}`;
+  const baseClasses = `absolute w-full h-full flex items-center justify-center cursor-grab transition-all z-20 
+    ${isDragging ? 'opacity-0' : 'hover:scale-110'} 
+    ${isPartnerHovered ? 'bg-blue-500/30 rounded-lg scale-110' : ''} 
+    ${isInsertHovered ? 'border-l-4 border-l-blue-400 shadow-blue-500/50 scale-105' : ''}`;
 
   return (
     <div ref={ref} className={baseClasses}>
@@ -274,85 +291,62 @@ function App() {
     }
   }, [circuit]);
 
-useEffect(() => {
-  return monitorForElements({
-    onDrop({ source, location }) {
-      const destination = location.current.dropTargets[0];
-      if (!destination) return; 
+  useEffect(() => {
+    return monitorForElements({
+      onDrop({ source, location }) {
+        const destination = location.current.dropTargets[0];
+        if (!destination) return; 
 
-      const gateData = source.data;
-      const slotData = destination.data;
+        const gateData = source.data;
+        const slotData = destination.data;
 
-      if (gateData.type === 'gate' && slotData.type === 'slot') {
-        setCircuit(prev => {
-          const newCircuit = prev.map(wire => [...wire]);
-          if (gateData.name === 'CNOT') {
-            const cIndex = slotData.wireIndex;
-            const tIndex = cIndex < prev.length - 1 ? cIndex + 1 : cIndex - 1;
+        if (gateData.type === 'gate' && slotData.type === 'slot') {
+          setCircuit(prev => {
+            const newCircuit = prev.map(wire => [...wire]);
+            if (gateData.name === 'CNOT') {
+              const cIndex = slotData.wireIndex;
+              const tIndex = cIndex < prev.length - 1 ? cIndex + 1 : cIndex - 1;
 
-            newCircuit[cIndex][slotData.stepIndex] = { 
-              name: 'CNOT', role: 'control', targetWire: tIndex 
-            };
+              newCircuit[cIndex][slotData.stepIndex] = { 
+                name: 'CNOT', role: 'control', targetWire: tIndex 
+              };
 
-            newCircuit[tIndex][slotData.stepIndex] = { 
-              name: 'CNOT', role: 'target', controlWire: cIndex 
-            };
-          } else {
-            newCircuit[slotData.wireIndex][slotData.stepIndex] = { name: gateData.name };
-          }
-          
-          return compactCircuit(newCircuit);
-        });
-      }
-      if (gateData.type === 'cnot-node' && slotData.type === 'cnot-partner') {
-        setCircuit(prev => {
-          const newCircuit = prev.map(wire => [...wire]);
-          const oldWire = gateData.wireIndex;
-          const peerWire = gateData.peerWire;
-          const step = gateData.stepIndex;
-
-          if (slotData.wireIndex === peerWire && slotData.stepIndex === step) {
+              newCircuit[tIndex][slotData.stepIndex] = { 
+                name: 'CNOT', role: 'target', controlWire: cIndex 
+              };
+            } else {
+              newCircuit[slotData.wireIndex][slotData.stepIndex] = { name: gateData.name };
+            }
             
-            newCircuit[oldWire][step] = {
+            return compactCircuit(newCircuit);
+          });
+          return;
+        }
+
+        if (gateData.type === 'cnot-node' && slotData.type === 'slot') {
+          setCircuit(prev => {
+            const newCircuit = prev.map(wire => [...wire]);
+            const { role, wireIndex: oldWire, stepIndex: oldStep, peerWire } = gateData;
+            const newWire = slotData.wireIndex;
+            const newStep = slotData.stepIndex;
+
+            if (newWire === peerWire && newStep === oldStep) return prev;
+            if (newStep !== oldStep) return prev; 
+            newCircuit[oldWire][oldStep] = null;
+            newCircuit[newWire][newStep] = {
               name: 'CNOT',
-              role: gateData.role === 'control' ? 'target' : 'control',
-              [gateData.role === 'control' ? 'controlWire' : 'targetWire']: peerWire
+              role: role,
+              [role === 'control' ? 'targetWire' : 'controlWire']: peerWire
+            };
+            newCircuit[peerWire][oldStep] = {
+              name: 'CNOT',
+              role: role === 'control' ? 'target' : 'control',
+              [role === 'control' ? 'controlWire' : 'targetWire']: newWire
             };
 
-            newCircuit[peerWire][step] = {
-              name: 'CNOT',
-              role: gateData.role,
-              [gateData.role === 'control' ? 'targetWire' : 'controlWire']: oldWire
-            };
-          }
-          return compactCircuit(newCircuit);
-        });
-        return; 
-      }
-
-      if (gateData.type === 'cnot-node' && slotData.type === 'slot') {
-        setCircuit(prev => {
-          const newCircuit = prev.map(wire => [...wire]);
-          const { role, wireIndex: oldWire, stepIndex: oldStep, peerWire } = gateData;
-          const newWire = slotData.wireIndex;
-          const newStep = slotData.stepIndex;
-
-          if (newWire === peerWire && newStep === oldStep) return prev;
-          if (newStep !== oldStep) return prev; 
-          newCircuit[oldWire][oldStep] = null;
-          newCircuit[newWire][newStep] = {
-            name: 'CNOT',
-            role: role,
-            [role === 'control' ? 'targetWire' : 'controlWire']: peerWire
-          };
-          newCircuit[peerWire][oldStep] = {
-            name: 'CNOT',
-            role: role === 'control' ? 'target' : 'control',
-            [role === 'control' ? 'controlWire' : 'targetWire']: newWire
-          };
-
-          return compactCircuit(newCircuit);
-        });
+            return compactCircuit(newCircuit);
+          });
+          return;
         }
 
         if (gateData.type === 'placed-gate' && slotData.type === 'slot') {
@@ -365,14 +359,41 @@ useEffect(() => {
             if (oldWire === newWire && oldStep === newStep) return prev;
 
             newCircuit[oldWire][oldStep] = null;
-            
             newCircuit[newWire][newStep] = { name };
 
             return compactCircuit(newCircuit);
           });
+          return;
         }
 
-        if (slotData.type === 'gate-insert') {
+        // --- PHASE 4.8 & 4.9 COMBINED: CNOT SWAPS & ALL INSERTIONS ---
+        const isCnotSwap = gateData.type === 'cnot-node' && 
+                           slotData.type === 'cnot-node-drop' && 
+                           slotData.wireIndex === gateData.peerWire && 
+                           slotData.stepIndex === gateData.stepIndex;
+
+        const isInsert = slotData.type === 'gate-insert' || 
+                         (slotData.type === 'cnot-node-drop' && !isCnotSwap);
+
+        if (isCnotSwap) {
+          setCircuit(prev => {
+            const newCircuit = prev.map(wire => [...wire]);
+            const oldWire = gateData.wireIndex;
+            const peerWire = gateData.peerWire;
+            const step = gateData.stepIndex;
+
+            newCircuit[oldWire][step] = {
+              name: 'CNOT', role: gateData.role === 'control' ? 'target' : 'control', [gateData.role === 'control' ? 'controlWire' : 'targetWire']: peerWire
+            };
+            newCircuit[peerWire][step] = {
+              name: 'CNOT', role: gateData.role, [gateData.role === 'control' ? 'targetWire' : 'controlWire']: oldWire
+            };
+            return compactCircuit(newCircuit);
+          });
+          return; 
+        }
+
+        if (isInsert) {
           setCircuit(prev => {
             let newCircuit = prev.map(wire => [...wire]);
             const insertStep = slotData.stepIndex;
@@ -413,9 +434,9 @@ useEffect(() => {
           });
           return;
         }
-    }
-  });
-}, []);
+      }
+    });
+  }, []);
 
   const addQubit = () => {
     const numSteps = circuit[0].length;
