@@ -6,7 +6,7 @@ const MeasurementHistogram = ({ data, shots }) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl">
       <h3 className="font-bold text-white mb-6 border-b border-slate-800 pb-2">
-        Measurement Histogram ({shots} Shots)
+        Measurement Histogram
       </h3>
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
