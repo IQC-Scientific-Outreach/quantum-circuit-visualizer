@@ -6,7 +6,7 @@ import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/ad
 // tomography -> timestep + choose my qubit?
 
 import initQuantumEngine from './wasm/quantum_engine.js'
-import { SINGLE_QUBIT_GATES, TWO_WIRE_GATES } from './constants';
+import { SINGLE_QUBIT_GATES } from './constants';
 import { compactCircuit } from './utils/compactCircuit';
 import { simulateShots } from './utils/simulateShots';
 import DraggableGate from './components/DraggableGate';
@@ -36,7 +36,13 @@ function App() {
   const [expectationValue, setExpectationValue] = useState(null);
   const [classicalBits, setClassicalBits] = useState([]);
 
-  const TWO_WIRE = ['CNOT', 'CC_X', 'CC_Z'];
+  const TWO_WIRE = ['CNOT', 'CZ', 'CC_X', 'CC_Z'];
+
+  // For each wire: the first step index that contains a MEASURE gate (-1 if none)
+  const measureStepPerWire = circuit.map(wire => {
+    const idx = wire.findIndex(cell => cell?.name === 'MEASURE');
+    return idx; // -1 if no MEASURE
+  });
 
   // ---------------------------------------------------------------------------
   // WASM engine
@@ -207,8 +213,8 @@ function App() {
             if (TWO_WIRE.includes(gateData.name)) {
               const cIndex = slotData.wireIndex;
               const tIndex = cIndex < prev.length - 1 ? cIndex + 1 : cIndex - 1;
-              newCircuit[cIndex][slotData.stepIndex] = { name: 'CNOT', role: 'control', targetWire: tIndex };
-              newCircuit[tIndex][slotData.stepIndex] = { name: 'CNOT', role: 'target', controlWire: cIndex };
+              newCircuit[cIndex][slotData.stepIndex] = { name: gateData.name, role: 'control', targetWire: tIndex };
+              newCircuit[tIndex][slotData.stepIndex] = { name: gateData.name, role: 'target', controlWire: cIndex };
             } else {
               newCircuit[slotData.wireIndex][slotData.stepIndex] = { name: gateData.name };
             }
@@ -220,7 +226,7 @@ function App() {
         if (gateData.type === 'cnot-node' && slotData.type === 'slot') {
           setCircuit(prev => {
             const newCircuit = prev.map(wire => [...wire]);
-            const { role, wireIndex: oldWire, stepIndex: oldStep, peerWire } = gateData;
+            const { name: gateName, role, wireIndex: oldWire, stepIndex: oldStep, peerWire } = gateData;
             const newWire = slotData.wireIndex;
             const newStep = slotData.stepIndex;
 
@@ -229,12 +235,12 @@ function App() {
 
             newCircuit[oldWire][oldStep] = null;
             newCircuit[newWire][newStep] = {
-              name: 'CNOT',
+              name: gateName,
               role,
               [role === 'control' ? 'targetWire' : 'controlWire']: peerWire,
             };
             newCircuit[peerWire][oldStep] = {
-              name: 'CNOT',
+              name: gateName,
               role: role === 'control' ? 'target' : 'control',
               [role === 'control' ? 'controlWire' : 'targetWire']: newWire,
             };
@@ -279,12 +285,12 @@ function App() {
             const step = gateData.stepIndex;
 
             newCircuit[oldWire][step] = {
-              name: 'CNOT',
+              name: gateData.name,
               role: gateData.role === 'control' ? 'target' : 'control',
               [gateData.role === 'control' ? 'controlWire' : 'targetWire']: peerWire,
             };
             newCircuit[peerWire][step] = {
-              name: 'CNOT',
+              name: gateData.name,
               role: gateData.role,
               [gateData.role === 'control' ? 'targetWire' : 'controlWire']: oldWire,
             };
@@ -315,8 +321,8 @@ function App() {
             if (gateData.type === 'gate') {
               if (TWO_WIRE.includes(gateData.name)) {
                 const tIndex = targetWire < prev.length - 1 ? targetWire + 1 : targetWire - 1;
-                newCircuit[targetWire][insertStep] = { name: 'CNOT', role: 'control', targetWire: tIndex };
-                newCircuit[tIndex][insertStep] = { name: 'CNOT', role: 'target', controlWire: targetWire };
+                newCircuit[targetWire][insertStep] = { name: gateData.name, role: 'control', targetWire: tIndex };
+                newCircuit[tIndex][insertStep] = { name: gateData.name, role: 'target', controlWire: targetWire };
               } else {
                 newCircuit[targetWire][insertStep] = { name: gateData.name };
               }
@@ -324,12 +330,12 @@ function App() {
               newCircuit[targetWire][insertStep] = { name: gateData.name };
             } else if (gateData.type === 'cnot-node') {
               newCircuit[targetWire][insertStep] = {
-                name: 'CNOT',
+                name: gateData.name,
                 role: gateData.role,
                 [gateData.role === 'control' ? 'targetWire' : 'controlWire']: gateData.peerWire,
               };
               newCircuit[gateData.peerWire][insertStep] = {
-                name: 'CNOT',
+                name: gateData.name,
                 role: gateData.role === 'control' ? 'target' : 'control',
                 [gateData.role === 'control' ? 'controlWire' : 'targetWire']: targetWire,
               };
@@ -399,9 +405,17 @@ function App() {
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">2-qubit</p>
-            <div className="flex flex-col gap-2 items-center">
-              {TWO_WIRE_GATES.map(gate => (
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Quantum 2q</p>
+            <div className="flex gap-2 justify-center">
+              {['CNOT', 'CZ'].map(gate => (
+                <DraggableGate key={gate} gate={gate} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-amber-500/70 uppercase tracking-widest mb-2">Classical ctrl</p>
+            <div className="flex gap-2 justify-center">
+              {['CC_X', 'CC_Z'].map(gate => (
                 <DraggableGate key={gate} gate={gate} />
               ))}
             </div>
@@ -457,7 +471,29 @@ function App() {
               </button>
 
               <div className="flex relative items-center py-2 px-1">
-                <div className="absolute left-0 right-0 h-px bg-slate-600 z-0" />
+                {/* Quantum segment — before (or no) MEASURE */}
+                {measureStepPerWire[wireIndex] === -1 ? (
+                  <div className="absolute left-0 right-0 h-px bg-slate-600 z-0" />
+                ) : (
+                  <>
+                    {/* Quantum portion: left edge → centre of MEASURE cell */}
+                    <div
+                      className="absolute left-0 h-px bg-slate-600 z-0"
+                      style={{ width: `calc(${measureStepPerWire[wireIndex]} * (3.5rem + 0.5rem) + 2rem)` }}
+                    />
+                    {/* Classical (double) portion: centre of MEASURE cell → right edge */}
+                    <div
+                      className="absolute right-0 z-0"
+                      style={{
+                        left: `calc(${measureStepPerWire[wireIndex]} * (3.5rem + 0.5rem) + 2rem)`,
+                        top: 'calc(50% - 2px)',
+                        height: '4px',
+                        borderTop:    '1.5px solid rgba(251,191,36,0.55)',
+                        borderBottom: '1.5px solid rgba(251,191,36,0.55)',
+                      }}
+                    />
+                  </>
+                )}
 
                 {wire.map((cell, stepIndex) => (
                   <div
@@ -474,8 +510,8 @@ function App() {
 
                           {cell.role === 'control' && (
                             <>
-                              {cell.name === 'CNOT' ? (
-                                /* Quantum wire: single slate line */
+                              {(cell.name === 'CNOT' || cell.name === 'CZ') ? (
+                                /* Quantum vertical: single slate line */
                                 <div
                                   className="absolute w-px bg-slate-400 z-0 pointer-events-none"
                                   style={{
@@ -486,7 +522,7 @@ function App() {
                                   }}
                                 />
                               ) : (
-                                /* Classical wire: double amber line */
+                                /* Classical vertical: double amber line */
                                 <div
                                   className="absolute z-0 pointer-events-none"
                                   style={{

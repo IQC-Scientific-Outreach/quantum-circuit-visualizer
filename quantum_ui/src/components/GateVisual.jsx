@@ -1,6 +1,5 @@
 /**
- * Renders the visual inside a gate cell (sidebar palette tiles only for multi-wire gates).
- * Single-qubit gates render their label; CNOT / CC_X / CC_Z get custom SVGs.
+ * Renders the visual inside a gate cell (sidebar palette tiles for multi-wire gates).
  */
 const GateVisual = ({ name }) => {
   if (name === 'CNOT') {
@@ -10,6 +9,18 @@ const GateVisual = ({ name }) => {
         <line x1="12" y1="6" x2="12" y2="21" strokeWidth="1.5" />
         <circle cx="12" cy="26" r="5" strokeWidth="1.5" />
         <path d="M12 21v10M7 26h10" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+
+  if (name === 'CZ') {
+    return (
+      <svg className="w-8 h-12" viewBox="0 0 24 32" fill="none" stroke="currentColor">
+        {/* control dot */}
+        <circle cx="12" cy="6" r="3" fill="currentColor" stroke="none" />
+        <line x1="12" y1="6" x2="12" y2="25" strokeWidth="1.5" />
+        {/* target dot */}
+        <circle cx="12" cy="26" r="3" fill="currentColor" stroke="none" />
       </svg>
     );
   }
@@ -49,7 +60,6 @@ const GateVisual = ({ name }) => {
     return (
       <div className="flex flex-col items-center gap-0.5 leading-none">
         <span className="text-lg font-bold">M</span>
-        {/* Meter arc */}
         <svg className="w-5 h-3" viewBox="0 0 20 10" fill="none" stroke="currentColor">
           <path d="M2 9 A8 8 0 0 1 18 9" strokeWidth="1.5" strokeLinecap="round" />
           <line x1="10" y1="9" x2="15" y2="3" strokeWidth="1.5" strokeLinecap="round" />

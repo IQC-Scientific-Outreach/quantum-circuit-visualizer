@@ -39,6 +39,19 @@ void QuantumState::apply_cnot(int control, int target) {
     }
 }
 
+void QuantumState::apply_cz(int control, int target) {
+    size_t c_pos    = num_qubits - 1 - control;
+    size_t t_pos    = num_qubits - 1 - target;
+    size_t c_mask   = 1ull << c_pos;
+    size_t t_mask   = 1ull << t_pos;
+    size_t full_size = 1ull << num_qubits;
+
+    for (size_t i = 0; i < full_size; ++i) {
+        if ((i & c_mask) && (i & t_mask))
+            state[i] = -state[i];
+    }
+}
+
 int QuantumState::measure_qubit(int qubit) {
     size_t bit_pos  = num_qubits - 1 - qubit;
     size_t full_size = 1ull << num_qubits;
