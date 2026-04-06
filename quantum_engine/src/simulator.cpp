@@ -38,3 +38,28 @@ vector<double> Simulator::get_statevector() const {
     }
     return flat_state;
 }
+
+double Simulator::get_expectation_z(int target_qubit) const {
+    const auto& state = q_state.get_state();
+    int num_states = state.size();
+
+    int num_qubits = 0;
+    while ((1 << num_qubits) < num_states) {
+        num_qubits++;
+    }
+
+    double exp_val = 0.0;
+    
+    for (int i = 0; i < num_states; i++) {
+        int bit = (i >> (num_qubits - 1 - target_qubit)) & 1;
+        double prob = norm(state[i]);
+        
+        if (bit == 0) {
+            exp_val += prob; // P(|0>)
+        } else {
+            exp_val -= prob; // P(|1>)
+        }
+    }
+    
+    return exp_val;
+}

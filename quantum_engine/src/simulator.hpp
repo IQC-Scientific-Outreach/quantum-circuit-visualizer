@@ -12,4 +12,5 @@ public:
     void run(const vector<Instruction>& circuit);
     vector<double> get_probabilities() const;
     vector<double> get_statevector() const;
+    double get_expectation_z(int target_qubit) const;
 };

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2 } from 'lucide-react';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+// expectation values? bell inequality reqp?
+// remote state prep
+// tomography -> timestep + choose my qubit?
 
 import initQuantumEngine from './wasm/quantum_engine.js'
 import { AVAILABLE_GATES } from './constants';
@@ -10,7 +13,8 @@ import DraggableGate from './components/DraggableGate';
 import DraggableCnotNode from './components/DraggableCnotNode';
 import DraggablePlacedGate from './components/DraggablePlacedGate';
 import DropZone from './components/DropZone';
-import MeasurementHistogram from './components/MeasurementHistogram'; 
+import MeasurementHistogram from './components/MeasurementHistogram';
+import ExpectationValue from './components/ExpectationValue';
 import './App.css'
 
 function App() {
@@ -23,11 +27,13 @@ function App() {
   const [probabilities, setProbabilities] = useState([]);
   const [stateVector, setStateVector] = useState([]);
   const [isReady, setIsReady] = useState(false);
-  
+
   const [shots, setShots] = useState(100);
   const [shotResults, setShotResults] = useState([]);
 
   const [measureStep, setMeasureStep] = useState(null);
+  const [selectedQubit, setSelectedQubit] = useState(null);
+  const [expectationValue, setExpectationValue] = useState(null);
 
   // ---------------------------------------------------------------------------
   // WASM engine
@@ -83,7 +89,7 @@ function App() {
     const cppProb = sim.get_probabilities();
     const probArr = [];
     const events = [];
-    
+
     for (let i = 0; i < cppProb.size(); i++) {
       probArr.push(cppProb.get(i));
       events.push(i.toString(2).padStart(numQubits, '0'));
@@ -92,7 +98,7 @@ function App() {
 
     const numShots = parseInt(shots, 10) || 100;
     const rawCounts = simulateShots(events, probArr, numShots);
-    
+
     const chartData = events.map(state => ({
       state: `|${state}⟩`,
       count: rawCounts[state]
@@ -109,11 +115,17 @@ function App() {
     }
     setStateVector(stateArr);
 
+    if (selectedQubit !== null && typeof sim.get_expectation_z === 'function') {
+      setExpectationValue(sim.get_expectation_z(selectedQubit));
+    } else {
+      setExpectationValue(null);
+    }
+
     sim.delete();
     cppCircuit.delete();
     cppProb.delete();
     cppState.delete();
-  }, [circuit, engine, shots]);
+  }, [circuit, engine, shots, selectedQubit]);
 
   useEffect(() => {
     if (isReady && engine) {
@@ -187,7 +199,7 @@ function App() {
             const newStep = slotData.stepIndex;
 
             if (newWire === peerWire && newStep === oldStep) return prev;
-            if (newStep !== oldStep) return prev; 
+            if (newStep !== oldStep) return prev;
 
             newCircuit[oldWire][oldStep] = null;
             newCircuit[newWire][newStep] = {
@@ -307,6 +319,27 @@ function App() {
   // ---------------------------------------------------------------------------
   // Circuit editing helpers
   // ---------------------------------------------------------------------------
+  const deleteGate = useCallback((wireIndex, stepIndex) => {
+    setCircuit(prev => {
+      const newCircuit = prev.map(wire => [...wire]);
+      const cell = newCircuit[wireIndex][stepIndex];
+      if (!cell) return prev;
+      if (cell.name === 'CNOT') {
+        const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
+        newCircuit[wireIndex][stepIndex] = null;
+        newCircuit[peerWire][stepIndex] = null;
+      } else {
+        newCircuit[wireIndex][stepIndex] = null;
+      }
+      return compactCircuit(newCircuit);
+    });
+  }, []);
+
+  const handleRightClickDelete = (e, wireIndex, stepIndex) => {
+    e.preventDefault();
+    deleteGate(wireIndex, stepIndex);
+  };
+
   const addQubit = () => {
     const numSteps = circuit[0].length;
     setCircuit([...circuit, Array(numSteps).fill(null)]);
@@ -317,122 +350,110 @@ function App() {
     setCircuit(circuit.filter((_, index) => index !== indexToRemove));
   };
 
-  const handleRightClickDelete = (e, wireIndex, stepIndex) => {
-    e.preventDefault();
-    setCircuit(prev => {
-      const newCircuit = prev.map(wire => [...wire]);
-      const cell = newCircuit[wireIndex][stepIndex];
-      if (!cell) return prev;
-
-      if (cell.name === 'CNOT') {
-        const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
-        newCircuit[wireIndex][stepIndex] = null;
-        newCircuit[peerWire][stepIndex] = null;
-      } else {
-        newCircuit[wireIndex][stepIndex] = null;
-      }
-
-      return compactCircuit(newCircuit);
-    });
-  };
-
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="fixed inset-0 flex flex-col font-sans text-slate-300 bg-slate-950">
+    <div className="fixed inset-0 flex font-sans text-slate-300 bg-slate-950">
 
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between z-20 shrink-0">
-        <h1 className="text-xl font-bold tracking-tight text-white">Quantum Circuit Visualizer</h1>
-        
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 text-sm text-slate-400 font-mono">
-            <label htmlFor="shots">Shots:</label>
+      {/* Left sidebar — title, gates, shots */}
+      <aside className="w-44 bg-slate-900 border-r border-slate-700/50 flex flex-col shrink-0 z-10">
+        <div className="px-4 py-3 border-b border-slate-700/50">
+          <h1 className="text-sm font-semibold text-white tracking-tight leading-tight">QC Visualizer</h1>
+          {!isReady && <p className="text-[10px] text-amber-400 animate-pulse mt-0.5">Initializing…</p>}
+        </div>
+
+        <div className="p-4 flex flex-col gap-5 overflow-y-auto flex-1">
+          <div>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Gates</p>
+            <div className="grid grid-cols-2 gap-3 items-center justify-items-center">
+              {AVAILABLE_GATES.map(gate => (
+                <DraggableGate key={gate} gate={gate} />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Shots</p>
             <input
-              id="shots"
               type="number"
               value={shots}
               onChange={(e) => setShots(e.target.value)}
-              className="w-24 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 text-xs font-mono focus:outline-none focus:border-slate-500 focus:text-white"
               min="1"
               max="100000"
             />
           </div>
-          {!isReady && (
-            <div className="text-sm text-amber-500 font-medium animate-pulse">
-              Initializing Engine...
-            </div>
-          )}
         </div>
-      </header>
+      </aside>
 
-      <div className="flex flex-1 overflow-hidden">
+      {/* Circuit board */}
+      <div className="flex-1 overflow-auto p-5 bg-slate-950">
+        <div className="bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl p-5 inline-block min-w-max">
 
-        <aside className="w-64 bg-slate-900 border-r border-slate-800 p-6 flex flex-col gap-6 z-10 shrink-0">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gates</h2>
-          <div className="grid grid-cols-2 gap-4 items-center justify-items-center">
-            {AVAILABLE_GATES.map(gate => (
-              <DraggableGate key={gate} gate={gate} />
-            ))}
-          </div>
-        </aside>
-
-        <main className="flex-1 p-8 overflow-auto flex flex-col gap-8 bg-slate-950">
-
-          <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-8 inline-block min-w-max self-start">
-
-          <div className="flex items-center mb-4">
-              <div className="w-16 text-xs text-slate-500 font-bold uppercase tracking-wider text-right pr-4">Time</div>
-              
-              <div className="flex relative items-center py-2 px-9">
-                {circuit[0]?.map((_, stepIndex) => (
-                  <div
-                    key={`time-${stepIndex}`}
-                    onClick={() => setMeasureStep(measureStep === stepIndex ? null : stepIndex)}
-                    className="w-14 h-6 relative flex items-center justify-center mx-1 z-30 cursor-pointer group/timeline"
-                    title={measureStep === stepIndex ? "Clear Scrubber" : `Measure at Step ${stepIndex}`}
-                  >
-                    <div className={`w-4 h-4 rounded-full border-2 transition-all ${
-                      measureStep === stepIndex
-                        ? 'bg-purple-500 border-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.5)] scale-125'
-                        : 'bg-slate-800 border-slate-600 group-hover/timeline:bg-slate-700'
-                    }`} />
-
-                    {measureStep === stepIndex && (
-                      <div
-                        className="absolute top-5 left-1/2 w-[2px] bg-purple-500/50 -translate-x-1/2 pointer-events-none"
-                        style={{ height: `${circuit.length * 5}rem` }}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {circuit.map((wire, wireIndex) => (
-              <div key={`wire-${wireIndex}`} className="flex items-center mb-2 group">
-
-                <div className="w-16 font-mono text-slate-500 font-medium">q[{wireIndex}]</div>
-
-                <div className="flex relative items-center py-2 px-1">
-                  <div className="absolute left-0 right-0 h-[2px] bg-slate-700 z-0" />
-
-                  {wire.map((cell, stepIndex) => (
+          {/* Time scrubber row */}
+          <div className="flex items-center mb-3">
+            <div className="w-16 text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-right pr-4">Time</div>
+            <div className="flex relative items-center py-2 px-9">
+              {circuit[0]?.map((_, stepIndex) => (
+                <div
+                  key={`time-${stepIndex}`}
+                  onClick={() => setMeasureStep(measureStep === stepIndex ? null : stepIndex)}
+                  className="w-14 h-5 relative flex items-center justify-center mx-1 z-30 cursor-pointer group/timeline"
+                  title={measureStep === stepIndex ? 'Clear scrubber' : `Measure at step ${stepIndex}`}
+                >
+                  <div className={`w-3 h-3 rounded-full border-2 transition-all ${
+                    measureStep === stepIndex
+                      ? 'bg-purple-500 border-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.5)] scale-125'
+                      : 'bg-slate-800 border-slate-600 group-hover/timeline:bg-slate-700'
+                  }`} />
+                  {measureStep === stepIndex && (
                     <div
-                      key={`slot-${wireIndex}-${stepIndex}`}
-                      className="w-14 h-14 relative flex items-center justify-center mx-1 z-10"
-                    >
-                      {cell ? (
-                        cell.name === 'CNOT' ? (
-                          <div
-                            className="w-full h-full relative flex items-center justify-center z-20"
-                            onContextMenu={(e) => handleRightClickDelete(e, wireIndex, stepIndex)}
-                          >
-                            <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
+                      className="absolute top-4 left-1/2 w-[2px] bg-purple-500/50 -translate-x-1/2 pointer-events-none"
+                      style={{ height: `${circuit.length * 5}rem` }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
 
-                            {cell.role === 'control' && (
+          {/* Qubit wires */}
+          {circuit.map((wire, wireIndex) => (
+            <div key={`wire-${wireIndex}`} className="flex items-center mb-2 group">
+
+              <button
+                onClick={() => setSelectedQubit(selectedQubit === wireIndex ? null : wireIndex)}
+                className={`w-16 font-mono font-medium text-right pr-4 text-sm transition-colors shrink-0 ${
+                  selectedQubit === wireIndex
+                    ? 'text-purple-400'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title={selectedQubit === wireIndex ? 'Clear ⟨Z⟩ selection' : `Show ⟨Z⟩ for q[${wireIndex}]`}
+              >
+                q[{wireIndex}]
+              </button>
+
+              <div className="flex relative items-center py-2 px-1">
+                <div className="absolute left-0 right-0 h-px bg-slate-600 z-0" />
+
+                {wire.map((cell, stepIndex) => (
+                  <div
+                    key={`slot-${wireIndex}-${stepIndex}`}
+                    className="w-14 h-14 relative flex items-center justify-center mx-1 z-10"
+                  >
+                    {cell ? (
+                      cell.name === 'CNOT' ? (
+                        <div
+                          className="w-full h-full relative flex items-center justify-center z-20 group/cnot"
+                          onContextMenu={(e) => handleRightClickDelete(e, wireIndex, stepIndex)}
+                        >
+                          <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
+
+                          {cell.role === 'control' && (
+                            <>
                               <div
-                                className="absolute w-[2px] bg-rose-400 z-0 pointer-events-none"
+                                className="absolute w-px bg-slate-400 z-0 pointer-events-none"
                                 style={{
                                   left: 'calc(50% - 1px)',
                                   top: cell.targetWire > wireIndex ? '50%' : 'auto',
@@ -440,88 +461,116 @@ function App() {
                                   height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem`,
                                 }}
                               />
-                            )}
-                          </div>
-                        ) : (
-                          <DraggablePlacedGate
-                            cell={cell}
-                            wireIndex={wireIndex}
-                            stepIndex={stepIndex}
-                            handleRightClickDelete={handleRightClickDelete}
-                          />
-                        )
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteGate(wireIndex, stepIndex); }}
+                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none"
+                                title="Delete gate"
+                              >×</button>
+                            </>
+                          )}
+                        </div>
                       ) : (
-                        <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => removeQubit(wireIndex)}
-                  className="ml-4 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove Qubit"
-                >
-                  <Trash2 size={18} />
-                </button>
+                        <DraggablePlacedGate
+                          cell={cell}
+                          wireIndex={wireIndex}
+                          stepIndex={stepIndex}
+                          handleRightClickDelete={handleRightClickDelete}
+                          onDelete={() => deleteGate(wireIndex, stepIndex)}
+                        />
+                      )
+                    ) : (
+                      <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
 
-            <div className="mt-6 flex gap-4">
               <button
-                onClick={addQubit}
-                className="flex items-center gap-1 text-sm font-semibold text-slate-400 hover:text-white transition-colors"
+                onClick={() => removeQubit(wireIndex)}
+                className="ml-3 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                title="Remove qubit"
               >
-                <Plus size={16} /> Add Qubit
+                <Trash2 size={15} />
               </button>
             </div>
+          ))}
+
+          <div className="mt-4">
+            <button
+              onClick={addQubit}
+              className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-white transition-colors"
+            >
+              <Plus size={13} /> Add Qubit
+            </button>
           </div>
+        </div>
+      </div>
 
-          {(probabilities.length > 0 || stateVector.length > 0) && (
-            <div className="flex flex-col gap-6 self-start min-w-[600px] w-full max-w-5xl">
-              
-              <MeasurementHistogram data={shotResults} shots={shots} />
+      {/* Results panel */}
+      <aside className="w-64 bg-slate-900 border-l border-slate-700/50 shrink-0 flex flex-col">
+        <div className="px-4 py-3 border-b border-slate-700/50 shrink-0 flex items-center gap-2">
+          <p className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">Results</p>
+          {measureStep !== null && (
+            <span className="text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded px-1.5 py-0.5">step {measureStep}</span>
+          )}
+        </div>
 
-              <div className="grid grid-cols-2 gap-6 items-start">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl">
-                  <h3 className="font-bold text-white mb-4 border-b border-slate-800 pb-2">Theoretical Probabilities</h3>
-                  <div className="flex flex-col gap-2 font-mono text-sm">
+        <div className="flex-1 overflow-y-auto flex flex-col divide-y divide-slate-700/40">
+          {!isReady ? (
+            <p className="text-[10px] text-slate-500 text-center mt-8 animate-pulse px-4">Initializing engine…</p>
+          ) : (
+            <>
+              {selectedQubit !== null && expectationValue !== null && (
+                <div className="px-4 py-3">
+                  <ExpectationValue qubitIndex={selectedQubit} value={expectationValue} measureStep={measureStep} />
+                </div>
+              )}
+
+              {probabilities.length > 0 && (
+                <div className="px-4 py-3">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Probabilities</p>
+                  <div className="flex flex-col gap-1.5 font-mono text-xs">
                     {probabilities.map((prob, index) => {
                       const numQubits = Math.log2(probabilities.length);
                       const label = index.toString(2).padStart(numQubits, '0');
                       if (prob === 0) return null;
                       return (
-                        <div key={`prob-${index}`} className="flex justify-between gap-12">
-                          <span className="text-slate-500">|{label}⟩</span>
-                          <span className="font-semibold text-blue-400">{(prob * 100).toFixed(2)}%</span>
+                        <div key={`prob-${index}`} className="flex justify-between items-center">
+                          <span className="text-slate-400">|{label}⟩</span>
+                          <span className="text-white font-medium tabular-nums">{(prob * 100).toFixed(2)}%</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
+              )}
 
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl">
-                  <h3 className="font-bold text-white mb-4 border-b border-slate-800 pb-2">Complex Amplitudes</h3>
-                  <div className="flex flex-col gap-2 font-mono text-sm">
+              {stateVector.length > 0 && (
+                <div className="px-4 py-3">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Amplitudes</p>
+                  <div className="flex flex-col gap-1.5 font-mono text-[11px]">
                     {stateVector.map((amp, index) => {
                       const numQubits = Math.log2(stateVector.length);
                       const label = index.toString(2).padStart(numQubits, '0');
                       if (amp === '0.0000 + 0.0000i' || amp === '0.0000 - 0.0000i') return null;
                       return (
-                        <div key={`amp-${index}`} className="flex justify-between gap-12">
-                          <span className="text-slate-500">|{label}⟩</span>
-                          <span className="font-semibold text-emerald-400">{amp}</span>
+                        <div key={`amp-${index}`} className="flex justify-between items-center gap-2">
+                          <span className="text-slate-400 shrink-0">|{label}⟩</span>
+                          <span className="text-slate-200 font-medium tabular-nums text-right">{amp}</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              </div>
+              )}
 
-            </div>
+              <div className="px-4 py-3">
+                <MeasurementHistogram data={shotResults} shots={shots} />
+              </div>
+            </>
           )}
-        </main>
-      </div>
+        </div>
+      </aside>
     </div>
   );
 }

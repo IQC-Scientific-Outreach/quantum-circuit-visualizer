@@ -4,24 +4,43 @@ const MeasurementHistogram = ({ data, shots }) => {
   if (!data || data.length === 0) return null;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl">
-      <h3 className="font-bold text-white mb-6 border-b border-slate-800 pb-2">
-        Measurement Histogram
-      </h3>
-      <div className="h-64 w-full">
+    <>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2.5">
+        Histogram
+        <span className="text-slate-500 normal-case font-normal ml-1.5">({shots} shots)</span>
+      </p>
+      <div className="h-48 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <XAxis dataKey="state" stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12}} />
-            <YAxis stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12}} allowDecimals={false} />
-            <Tooltip 
-              cursor={{fill: '#1e293b'}} 
-              contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc'}} 
+          <BarChart data={data} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+            <XAxis
+              dataKey="state"
+              stroke="#475569"
+              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              axisLine={{ stroke: '#334155' }}
+              tickLine={false}
             />
-            <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            <YAxis
+              stroke="#475569"
+              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              axisLine={{ stroke: '#334155' }}
+              tickLine={false}
+              allowDecimals={false}
+            />
+            <Tooltip
+              cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+              contentStyle={{
+                backgroundColor: '#1e293b',
+                borderColor: '#334155',
+                color: '#f1f5f9',
+                fontSize: 11,
+                borderRadius: 6,
+              }}
+            />
+            <Bar dataKey="count" fill="#38bdf8" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </>
   );
 };
 

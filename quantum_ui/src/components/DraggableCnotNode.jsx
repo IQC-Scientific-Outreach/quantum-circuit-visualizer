@@ -67,17 +67,17 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
   return (
     <div ref={ref} className={baseClasses}>
       {cell.role === 'control' && (
-        <div className="w-4 h-4 rounded-full bg-rose-400" />
+        <div className="w-3.5 h-3.5 rounded-full bg-slate-300" />
       )}
       {cell.role === 'target' && (
         <svg
-          className="w-8 h-8 text-rose-400 bg-slate-950 rounded-full"
+          className="w-8 h-8 text-slate-300 bg-slate-900 rounded-full"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
         >
-          <circle cx="12" cy="12" r="10" strokeWidth="2" />
-          <path d="M12 2v20M2 12h20" strokeWidth="2" />
+          <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
+          <path d="M12 2v20M2 12h20" strokeWidth="1.5" />
         </svg>
       )}
     </div>
