@@ -15,6 +15,9 @@ void Simulator::run(const vector<Instruction>& circuit) {
         } else if (inst.name == "CZ") {
             q_state.apply_cz(inst.qubits[0], inst.qubits[1]);
 
+        } else if (inst.name == "TOFFOLI") {
+            q_state.apply_toffoli(inst.qubits[0], inst.qubits[1], inst.qubits[2]);
+
         } else if (inst.name == "MEASURE") {
             int q = inst.qubits[0];
             classical_bits[q] = q_state.measure_qubit(q);

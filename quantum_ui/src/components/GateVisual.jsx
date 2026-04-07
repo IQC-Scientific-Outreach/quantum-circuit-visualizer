@@ -15,6 +15,20 @@ const GateVisual = ({ name }) => {
     );
   }
 
+  if (name === 'TOFFOLI') {
+    // CCX: two dot controls, square-X target
+    return (
+      <svg className="w-8 h-16" viewBox="0 0 24 44" fill="none" stroke="currentColor">
+        <circle cx="12" cy="6" r="3" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="20" r="3" fill="currentColor" stroke="none" />
+        <line x1="12" y1="6" x2="12" y2="32" strokeWidth="1.5" />
+        <rect x="5" y="32" width="14" height="10" rx="1.5" strokeWidth="1.5" />
+        <text x="12" y="40.5" textAnchor="middle" fontSize="8" fill="currentColor"
+              stroke="none" fontWeight="bold" fontFamily="monospace">X</text>
+      </svg>
+    );
+  }
+
   if (name === 'CZ') {
     // Controlled-Z: dot control, Z-box target
     return (

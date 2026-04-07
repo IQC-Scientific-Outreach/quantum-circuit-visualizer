@@ -17,6 +17,8 @@ export const compactCircuit = (oldCircuit) => {
         if (!cell) continue;
   
         const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
+        const THREE_WIRE = ['TOFFOLI'];
+        
         if (TWO_WIRE.includes(cell.name)) {
           const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
   
@@ -36,6 +38,31 @@ export const compactCircuit = (oldCircuit) => {
           newCircuit[wire][targetStep] = { ...cell };
           newCircuit[peerWire][targetStep] = { ...oldCircuit[peerWire][step] };
   
+          for (let w = minWire; w <= maxWire; w++) {
+            tail[w] = targetStep;
+          }
+        } else if (THREE_WIRE.includes(cell.name)) {
+          const c1 = cell.controls[0];
+          const c2 = cell.controls[1];
+          const t = cell.targetWire;
+
+          const minWire = Math.min(c1, c2, t);
+          const maxWire = Math.max(c1, c2, t);
+
+          const gateId = `toffoli-${minWire}-${maxWire}-${step}`;
+          if (processedCNOTs.has(gateId)) continue;
+          processedCNOTs.add(gateId);
+
+          let maxTail = -1;
+          for (let w = minWire; w <= maxWire; w++) {
+            if (tail[w] > maxTail) maxTail = tail[w];
+          }
+
+          const targetStep = maxTail + 1;
+          newCircuit[c1][targetStep] = { ...oldCircuit[c1][step] };
+          newCircuit[c2][targetStep] = { ...oldCircuit[c2][step] };
+          newCircuit[t][targetStep]  = { ...oldCircuit[t][step] };
+
           for (let w = minWire; w <= maxWire; w++) {
             tail[w] = targetStep;
           }

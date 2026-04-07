@@ -84,6 +84,10 @@ function App() {
           if (cell.role === 'control') {
             compiledInstructions.push({ name: cell.name, qubits: [wire, cell.targetWire] });
           }
+        } else if (cell.name === 'TOFFOLI') {
+          if (cell.role === 'target') {
+            compiledInstructions.push({ name: 'TOFFOLI', qubits: [cell.controls[0], cell.controls[1], wire] });
+          }
         } else {
           compiledInstructions.push({ name: cell.name, qubits: [wire] });
         }
@@ -236,6 +240,7 @@ function App() {
             if (TWO_WIRE.includes(gateData.name)) {
               const cIndex = slotData.wireIndex;
               const tIndex = cIndex < prev.length - 1 ? cIndex + 1 : cIndex - 1;
+              if (tIndex < 0 || tIndex >= prev.length) return prev;
               // Validate: classical gates need a measured control wire;
               //           quantum gates need an unmeasured control wire;
               //           target must always be unmeasured.
@@ -247,6 +252,21 @@ function App() {
               if (tgtMeasured) return prev;
               newCircuit[cIndex][slotData.stepIndex] = { name: gateData.name, role: 'control', targetWire: tIndex };
               newCircuit[tIndex][slotData.stepIndex] = { name: gateData.name, role: 'target', controlWire: cIndex };
+            } else if (gateData.name === 'TOFFOLI') {
+            const c1 = slotData.wireIndex;
+              if (prev.length < 3) return prev;
+            const c2 = c1 + 1 < prev.length ? c1 + 1 : c1 - 1;
+            const tIndex = [c1 + 2, c1 - 1, c1 - 2].find(w => w >= 0 && w < prev.length && w !== c2) ?? 
+                           [...Array(prev.length).keys()].find(w => w !== c1 && w !== c2);
+
+              const c1Measured = prev[c1]?.some(c => c?.name === 'MEASURE') ?? false;
+              const c2Measured = prev[c2]?.some(c => c?.name === 'MEASURE') ?? false;
+              const tgtMeasured  = prev[tIndex]?.some(c => c?.name === 'MEASURE') ?? false;
+              if (c1Measured || c2Measured || tgtMeasured) return prev;
+
+              newCircuit[c1][slotData.stepIndex] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
+              newCircuit[c2][slotData.stepIndex] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
+              newCircuit[tIndex][slotData.stepIndex] = { name: 'TOFFOLI', role: 'target', controls: [c1, c2], targetWire: tIndex };
             } else {
               newCircuit[slotData.wireIndex][slotData.stepIndex] = { name: gateData.name };
             }
@@ -290,6 +310,49 @@ function App() {
           return;
         }
 
+        if (gateData.type === 'toffoli-node' && slotData.type === 'slot') {
+          setCircuit(prev => {
+            const newCircuit = prev.map(wire => [...wire]);
+            const { name: gateName, role, wireIndex: oldWire, stepIndex: oldStep, controls, targetWire } = gateData;
+            const newWire = slotData.wireIndex;
+            const newStep = slotData.stepIndex;
+
+            if (newWire === oldWire && newStep === oldStep) return prev;
+            if (newStep !== oldStep) return prev;
+
+            if (role === 'control') {
+              const otherControl = controls.find(c => c !== oldWire);
+              if (newWire === otherControl || newWire === targetWire) return prev;
+            } else {
+              if (controls.includes(newWire)) return prev;
+            }
+
+            const isMeasured = prev[newWire]?.some(c => c?.name === 'MEASURE') ?? false;
+            if (isMeasured) return prev;
+
+            newCircuit[oldWire][oldStep] = null;
+            let newControls = [...controls];
+            let newTarget = targetWire;
+            if (role === 'control') {
+              newControls = [newWire, controls.find(c => c !== oldWire)];
+            } else {
+              newTarget = newWire;
+            }
+
+            newCircuit[newWire][newStep] = { name: gateName, role, controls: newControls, targetWire: newTarget };
+            if (role === 'control') {
+              const otherControl = controls.find(c => c !== oldWire);
+              newCircuit[otherControl][oldStep].controls = newControls;
+              newCircuit[targetWire][oldStep].controls = newControls;
+            } else {
+              newCircuit[controls[0]][oldStep].targetWire = newTarget;
+              newCircuit[controls[1]][oldStep].targetWire = newTarget;
+            }
+            return compactCircuit(newCircuit);
+          });
+          return;
+        }
+
         if (gateData.type === 'placed-gate' && slotData.type === 'slot') {
           setCircuit(prev => {
             const newCircuit = prev.map(wire => [...wire]);
@@ -313,9 +376,42 @@ function App() {
           slotData.wireIndex === gateData.peerWire &&
           slotData.stepIndex === gateData.stepIndex;
 
+        const isToffoliSwap =
+          gateData.type === 'toffoli-node' &&
+          slotData.type === 'cnot-node-drop' &&
+          (gateData.controls.includes(slotData.wireIndex) || gateData.targetWire === slotData.wireIndex) &&
+          slotData.stepIndex === gateData.stepIndex;
+
         const isInsert =
           slotData.type === 'gate-insert' ||
           (slotData.type === 'cnot-node-drop' && !isCnotSwap);
+
+        if (isToffoliSwap) {
+          setCircuit(prev => {
+            const newCircuit = prev.map(wire => [...wire]);
+            const oldWire = gateData.wireIndex;
+            const swapWire = slotData.wireIndex;
+            const step = gateData.stepIndex;
+            const oldRole = newCircuit[oldWire][step].role;
+            const swapRole = newCircuit[swapWire][step].role;
+            if (oldRole === swapRole) return prev;
+            const controls = [...gateData.controls];
+            let newControls = controls;
+            if (oldRole === 'control') newControls = [swapWire, controls.find(c => c !== oldWire)];
+            else newControls = [oldWire, controls.find(c => c !== swapWire)];
+            const newTarget = oldRole === 'control' ? oldWire : swapWire;
+            newCircuit[oldWire][step].role = swapRole;
+            newCircuit[swapWire][step].role = oldRole;
+            newCircuit[newControls[0]][step].controls = newControls;
+            newCircuit[newControls[0]][step].targetWire = newTarget;
+            newCircuit[newControls[1]][step].controls = newControls;
+            newCircuit[newControls[1]][step].targetWire = newTarget;
+            newCircuit[newTarget][step].controls = newControls;
+            newCircuit[newTarget][step].targetWire = newTarget;
+            return compactCircuit(newCircuit);
+          });
+          return;
+        }
 
         if (isCnotSwap) {
           setCircuit(prev => {
@@ -350,6 +446,10 @@ function App() {
             } else if (gateData.type === 'cnot-node') {
               newCircuit[gateData.wireIndex][gateData.stepIndex] = null;
               newCircuit[gateData.peerWire][gateData.stepIndex] = null;
+            } else if (gateData.type === 'toffoli-node') {
+              newCircuit[gateData.controls[0]][gateData.stepIndex] = null;
+              newCircuit[gateData.controls[1]][gateData.stepIndex] = null;
+              newCircuit[gateData.targetWire][gateData.stepIndex] = null;
             }
 
             newCircuit = newCircuit.map(wire => {
@@ -361,8 +461,19 @@ function App() {
             if (gateData.type === 'gate') {
               if (TWO_WIRE.includes(gateData.name)) {
                 const tIndex = targetWire < prev.length - 1 ? targetWire + 1 : targetWire - 1;
+                if (tIndex < 0 || tIndex >= prev.length) return prev;
                 newCircuit[targetWire][insertStep] = { name: gateData.name, role: 'control', targetWire: tIndex };
                 newCircuit[tIndex][insertStep] = { name: gateData.name, role: 'target', controlWire: targetWire };
+              } else if (gateData.name === 'TOFFOLI') {
+                const c1 = targetWire;
+                if (prev.length >= 3) {
+                  const c2 = c1 + 1 < prev.length ? c1 + 1 : c1 - 1;
+                  const tIndex = [c1 + 2, c1 - 1, c1 - 2].find(w => w >= 0 && w < prev.length && w !== c2) ?? 
+                                 [...Array(prev.length).keys()].find(w => w !== c1 && w !== c2);
+                  newCircuit[c1][insertStep] = { name: gateData.name, role: 'control', controls: [c1, c2], targetWire: tIndex };
+                  newCircuit[c2][insertStep] = { name: gateData.name, role: 'control', controls: [c1, c2], targetWire: tIndex };
+                  newCircuit[tIndex][insertStep] = { name: gateData.name, role: 'target', controls: [c1, c2], targetWire: tIndex };
+                }
               } else {
                 newCircuit[targetWire][insertStep] = { name: gateData.name };
               }
@@ -379,6 +490,10 @@ function App() {
                 role: gateData.role === 'control' ? 'target' : 'control',
                 [gateData.role === 'control' ? 'controlWire' : 'targetWire']: targetWire,
               };
+            } else if (gateData.type === 'toffoli-node') {
+              newCircuit[gateData.controls[0]][insertStep] = { name: gateData.name, role: 'control', controls: gateData.controls, targetWire: gateData.targetWire };
+              newCircuit[gateData.controls[1]][insertStep] = { name: gateData.name, role: 'control', controls: gateData.controls, targetWire: gateData.targetWire };
+              newCircuit[gateData.targetWire][insertStep] = { name: gateData.name, role: 'target', controls: gateData.controls, targetWire: gateData.targetWire };
             }
 
             return compactCircuit(newCircuit);
@@ -400,6 +515,10 @@ function App() {
         const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
         newCircuit[wireIndex][stepIndex] = null;
         newCircuit[peerWire][stepIndex] = null;
+      } else if (cell.name === 'TOFFOLI') {
+        newCircuit[cell.controls[0]][stepIndex] = null;
+        newCircuit[cell.controls[1]][stepIndex] = null;
+        newCircuit[cell.targetWire][stepIndex] = null;
       } else {
         newCircuit[wireIndex][stepIndex] = null;
       }
@@ -425,14 +544,24 @@ function App() {
       const cleaned = prev.map((wire, wi) => {
         if (wi === indexToRemove) return wire; // will be filtered out below
         return wire.map(cell => {
-          if (!cell || !TWO_WIRE.includes(cell.name)) return cell;
-          const peerKey = cell.role === 'control' ? 'targetWire' : 'controlWire';
-          const peer = cell[peerKey];
-          if (peer === indexToRemove) return null; // orphaned — delete it
-          // Remap: if peer was above the removed wire, shift index down
-          return peer > indexToRemove
-            ? { ...cell, [peerKey]: peer - 1 }
-            : cell;
+          if (!cell) return cell;
+          if (TWO_WIRE.includes(cell.name)) {
+            const peerKey = cell.role === 'control' ? 'targetWire' : 'controlWire';
+            const peer = cell[peerKey];
+            if (peer === indexToRemove) return null; // orphaned — delete it
+            // Remap: if peer was above the removed wire, shift index down
+            return peer > indexToRemove
+              ? { ...cell, [peerKey]: peer - 1 }
+              : cell;
+          } else if (cell.name === 'TOFFOLI') {
+            if (cell.controls.includes(indexToRemove) || cell.targetWire === indexToRemove) return null;
+            return {
+              ...cell,
+              controls: cell.controls.map(c => c > indexToRemove ? c - 1 : c),
+              targetWire: cell.targetWire > indexToRemove ? cell.targetWire - 1 : cell.targetWire
+            };
+          }
+          return cell;
         });
       });
       // 2. Drop the deleted wire and compact the result.
@@ -599,6 +728,14 @@ function App() {
             </div>
           </div>
           <div>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Quantum 3q</p>
+            <div className="flex gap-2 justify-center">
+              {['TOFFOLI'].map(gate => (
+                <DraggableGate key={gate} gate={gate} />
+              ))}
+            </div>
+          </div>
+          <div>
             <p className="text-[10px] font-semibold text-amber-500/70 uppercase tracking-widest mb-2">Classical ctrl</p>
             <div className="flex gap-2 justify-center">
               {['FF_x', 'FF_Z'].map(gate => (
@@ -684,45 +821,65 @@ function App() {
                     className="w-14 h-14 relative flex items-center justify-center mx-1 z-10"
                   >
                     {cell ? (
-                      TWO_WIRE.includes(cell.name) ? (
+                      (TWO_WIRE.includes(cell.name) || cell.name === 'TOFFOLI') ? (
                         <div
                           className="w-full h-full relative flex items-center justify-center z-20 group/cnot"
                           onContextMenu={(e) => handleRightClickDelete(e, wireIndex, stepIndex)}
                         >
                           <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
 
-                          {cell.role === 'control' && (
-                            <>
-                              {(cell.name === 'CNOT' || cell.name === 'CZ') ? (
+                          {cell.name === 'TOFFOLI' ? (
+                            wireIndex === Math.min(...cell.controls, cell.targetWire) && (
+                              <>
                                 <div
                                   className="absolute w-px bg-slate-400 z-0 pointer-events-none"
                                   style={{
                                     left: 'calc(50% - 1px)',
-                                    top: cell.targetWire > wireIndex ? '50%' : 'auto',
-                                    bottom: cell.targetWire < wireIndex ? '50%' : 'auto',
-                                    height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem`,
+                                    top: '50%',
+                                    height: `${(Math.max(...cell.controls, cell.targetWire) - wireIndex) * 5}rem`,
                                   }}
                                 />
-                              ) : (
-                                <div
-                                  className="absolute z-0 pointer-events-none"
-                                  style={{
-                                    left: 'calc(50% - 3px)',
-                                    top: cell.targetWire > wireIndex ? '50%' : 'auto',
-                                    bottom: cell.targetWire < wireIndex ? '50%' : 'auto',
-                                    height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem`,
-                                    width: '6px',
-                                    borderLeft:  '1.5px solid rgba(251,191,36,0.6)',
-                                    borderRight: '1.5px solid rgba(251,191,36,0.6)',
-                                  }}
-                                />
-                              )}
-                              <button
-                                onClick={(e) => { e.stopPropagation(); deleteGate(wireIndex, stepIndex); }}
-                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none"
-                                title="Delete gate"
-                              >×</button>
-                            </>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteGate(wireIndex, stepIndex); }}
+                                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none"
+                                  title="Delete gate"
+                                >×</button>
+                              </>
+                            )
+                          ) : (
+                            cell.role === 'control' && (
+                              <>
+                                {(cell.name === 'CNOT' || cell.name === 'CZ') ? (
+                                  <div
+                                    className="absolute w-px bg-slate-400 z-0 pointer-events-none"
+                                    style={{
+                                      left: 'calc(50% - 1px)',
+                                      top: cell.targetWire > wireIndex ? '50%' : 'auto',
+                                      bottom: cell.targetWire < wireIndex ? '50%' : 'auto',
+                                      height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem`,
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    className="absolute z-0 pointer-events-none"
+                                    style={{
+                                      left: 'calc(50% - 3px)',
+                                      top: cell.targetWire > wireIndex ? '50%' : 'auto',
+                                      bottom: cell.targetWire < wireIndex ? '50%' : 'auto',
+                                      height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem`,
+                                      width: '6px',
+                                      borderLeft:  '1.5px solid rgba(251,191,36,0.6)',
+                                      borderRight: '1.5px solid rgba(251,191,36,0.6)',
+                                    }}
+                                  />
+                                )}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteGate(wireIndex, stepIndex); }}
+                                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none"
+                                  title="Delete gate"
+                                >×</button>
+                              </>
+                            )
                           )}
                         </div>
                       ) : (
@@ -892,8 +1049,8 @@ function App() {
                   Load ↵
                 </button>
                 <p className="text-[9px] text-slate-600 mt-1.5 leading-relaxed">
-                  Gates: h x y z t m cx cz ffx ffz<br />
-                  e.g. <span className="text-slate-500">h(0), cx(0,1), m(1)</span>
+                  Gates: h x y z t m cx cz ccx ffx ffz<br />
+                  e.g. <span className="text-slate-500">h(0), cx(0,1), ccx(0,1,2)</span>
                 </p>
               </div>
             </>

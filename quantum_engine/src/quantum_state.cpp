@@ -52,6 +52,22 @@ void QuantumState::apply_cz(int control, int target) {
     }
 }
 
+void QuantumState::apply_toffoli(int control1, int control2, int target) {
+    size_t c1_pos    = num_qubits - 1 - control1;
+    size_t c2_pos    = num_qubits - 1 - control2;
+    size_t t_pos     = num_qubits - 1 - target;
+    size_t c1_mask   = 1ull << c1_pos;
+    size_t c2_mask   = 1ull << c2_pos;
+    size_t t_mask    = 1ull << t_pos;
+    size_t full_size = 1ull << num_qubits;
+
+    for (size_t i = 0; i < full_size; ++i) {
+        if ((i & c1_mask) && (i & c2_mask) && ((i & t_mask) == 0)) {
+            swap(state[i], state[i | t_mask]);
+        }
+    }
+}
+
 int QuantumState::measure_qubit(int qubit) {
     size_t bit_pos  = num_qubits - 1 - qubit;
     size_t full_size = 1ull << num_qubits;

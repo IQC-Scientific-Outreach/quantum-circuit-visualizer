@@ -2,11 +2,11 @@ import { useRef, useEffect, useState } from 'react';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 
 /**
- * Renders one node of a placed two-wire gate: CNOT, CZ, FF_x, or FF_Z.
+ * Renders one node of a placed multi-wire gate: CNOT, CZ, FF_x, FF_Z, or TOFFOLI.
  *
- * Quantum 2q (CNOT, CZ) — slate color
- *   CNOT  control: filled circle   target: ⊕
- *   CZ    control: filled circle   target: filled circle
+ * Quantum (CNOT, CZ, TOFFOLI) — slate color
+ *   CNOT / TOFFOLI control: filled circle   target: X
+ *   CZ             control: filled circle   target: filled circle
  *
  * Classically-controlled (FF_x, FF_Z) — amber color
  *   FF_x  control: filled square   target: ⊕
@@ -25,12 +25,14 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
     const cleanupDrag = draggable({
       element: el,
       getInitialData: () => ({
-        type: 'cnot-node',
+        type: cell.name === 'TOFFOLI' ? 'toffoli-node' : 'cnot-node',
         name: cell.name,
         role: cell.role,
         wireIndex,
         stepIndex,
-        peerWire: cell.role === 'control' ? cell.targetWire : cell.controlWire,
+        peerWire: cell.name === 'TOFFOLI' ? undefined : (cell.role === 'control' ? cell.targetWire : cell.controlWire),
+        controls: cell.controls,
+        targetWire: cell.targetWire,
       }),
       onDragStart: () => setIsDragging(true),
       onDrop:      () => setIsDragging(false),
@@ -44,6 +46,12 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
           source.data.type === 'cnot-node' &&
           source.data.peerWire === wireIndex &&
           source.data.stepIndex === stepIndex
+        ) {
+          setIsPartnerHovered(true);
+        } else if (
+          source.data.type === 'toffoli-node' &&
+          source.data.stepIndex === stepIndex &&
+          (source.data.controls.includes(wireIndex) || source.data.targetWire === wireIndex)
         ) {
           setIsPartnerHovered(true);
         } else {
@@ -69,7 +77,7 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
 
       {/* ── Control nodes ── */}
       {cell.role === 'control' && !isClassical && (
-        // CNOT or CZ: quantum filled circle
+        // CNOT, CZ, or TOFFOLI: quantum filled circle
         <div className="w-3.5 h-3.5 rounded-full bg-slate-300" />
       )}
       {cell.role === 'control' && isClassical && (
@@ -78,8 +86,8 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
       )}
 
       {/* ── Target nodes ── */}
-      {/* CNOT target: square with X (slate) */}
-      {cell.role === 'target' && cell.name === 'CNOT' && (
+      {/* CNOT/TOFFOLI target: square with X (slate) */}
+      {cell.role === 'target' && (cell.name === 'CNOT' || cell.name === 'TOFFOLI') && (
         <div className="w-9 h-9 border-2 border-slate-400/80 bg-slate-800/60 rounded flex items-center justify-center">
           <span className="text-slate-200 text-base font-bold leading-none select-none">X</span>
         </div>
