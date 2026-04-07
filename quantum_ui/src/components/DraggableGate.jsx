@@ -3,11 +3,11 @@ import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import GateVisual from './GateVisual';
 import { GATE_STYLES } from '../constants';
 
-const TWO_WIRE = ['CNOT', 'CC_X', 'CC_Z'];
+const TWO_WIRE = ['CNOT', 'FF_x', 'FF_Z'];
 
 /**
  * A draggable gate tile shown in the sidebar palette.
- * Two-wire gates (CNOT, CC_X, CC_Z) use a compact icon layout.
+ * Two-wire gates (CNOT, FF_x, FF_Z) use a compact icon layout.
  * Single-qubit gates use a square tile.
  */
 const DraggableGate = ({ gate }) => {

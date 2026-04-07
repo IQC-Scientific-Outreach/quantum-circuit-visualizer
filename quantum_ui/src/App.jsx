@@ -1,14 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Trash2 } from 'lucide-react';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-// expectation values? bell inequality reqp?
-// remote state prep
-// tomography -> timestep + choose my qubit?
 
 import initQuantumEngine from './wasm/quantum_engine.js'
 import { SINGLE_QUBIT_GATES } from './constants';
 import { compactCircuit } from './utils/compactCircuit';
 import { simulateShots } from './utils/simulateShots';
+import { circuitToCode, parseCode } from './utils/circuitCode';
 import DraggableGate from './components/DraggableGate';
 import DraggableCnotNode from './components/DraggableCnotNode';
 import DraggablePlacedGate from './components/DraggablePlacedGate';
@@ -34,14 +32,19 @@ function App() {
   const [measureStep, setMeasureStep] = useState(null);
   const [selectedQubit, setSelectedQubit] = useState(null);
   const [expectationValue, setExpectationValue] = useState(null);
-  const [classicalBits, setClassicalBits] = useState([]);
+  const [, setClassicalBits] = useState([]);
 
-  const TWO_WIRE = ['CNOT', 'CZ', 'CC_X', 'CC_Z'];
+  // Circuit code input state
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState(null);
+  const codeInputFocused = useRef(false);
+
+  const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
 
   // For each wire: the first step index that contains a MEASURE gate (-1 if none)
   const measureStepPerWire = circuit.map(wire => {
     const idx = wire.findIndex(cell => cell?.name === 'MEASURE');
-    return idx; // -1 if no MEASURE
+    return idx;
   });
 
   // ---------------------------------------------------------------------------
@@ -65,7 +68,8 @@ function App() {
 
     const numQubits = circuit.length;
     const sim = new engine.Simulator(numQubits);
-    const cppCircuit = new engine.VectorInstruction();
+    const cppCircuitDisplay = new engine.VectorInstruction();
+    const cppCircuitShots = new engine.VectorInstruction();
 
     const compiledInstructions = [];
 
@@ -81,21 +85,33 @@ function App() {
             compiledInstructions.push({ name: cell.name, qubits: [wire, cell.targetWire] });
           }
         } else {
-          // Single-qubit gate or MEASURE
           compiledInstructions.push({ name: cell.name, qubits: [wire] });
         }
       }
     }
 
     compiledInstructions.forEach(inst => {
-      const cppQubits = new engine.VectorInt();
-      inst.qubits.forEach(q => cppQubits.push_back(q));
-      cppCircuit.push_back({ name: inst.name, qubits: cppQubits });
-      cppQubits.delete();
+      // For shots, use exact instructions (actual collapse)
+      const cppQubitsShots = new engine.VectorInt();
+      inst.qubits.forEach(q => cppQubitsShots.push_back(q));
+      cppCircuitShots.push_back({ name: inst.name, qubits: cppQubitsShots });
+      cppQubitsShots.delete();
+
+      // For display, defer measurements to preserve superposition for exact probabilities
+      if (inst.name !== 'MEASURE') {
+        let deferredName = inst.name;
+        if (inst.name === 'FF_x') deferredName = 'CNOT';
+        else if (inst.name === 'FF_Z') deferredName = 'CZ';
+
+        const cppQubitsDisplay = new engine.VectorInt();
+        inst.qubits.forEach(q => cppQubitsDisplay.push_back(q));
+        cppCircuitDisplay.push_back({ name: deferredName, qubits: cppQubitsDisplay });
+        cppQubitsDisplay.delete();
+      }
     });
 
-    // --- Single display run (probabilities, amplitudes, expectation, classical bits) ---
-    sim.run(cppCircuit);
+    // --- Single display run ---
+    sim.run(cppCircuitDisplay);
 
     const cppProb = sim.get_probabilities();
     const probArr = [];
@@ -111,8 +127,7 @@ function App() {
     for (let i = 0; i < cppState.size(); i += 2) {
       const real = cppState.get(i);
       const imag = cppState.get(i + 1);
-      const sign = imag >= 0 ? '+' : '-';
-      stateArr.push(`${real.toFixed(4)} ${sign} ${Math.abs(imag).toFixed(4)}i`);
+      stateArr.push({ real, imag });
     }
     setStateVector(stateArr);
 
@@ -132,7 +147,7 @@ function App() {
     cppState.delete();
     cppBits.delete();
 
-    // --- Histogram: multi-shot if measurements present, otherwise sample from probs ---
+    // --- Histogram ---
     const hasMeasurements = compiledInstructions.some(i => i.name === 'MEASURE');
     const numShots = parseInt(shots, 10) || 100;
 
@@ -140,7 +155,7 @@ function App() {
       const counts = Object.fromEntries(events.map(e => [e, 0]));
       for (let s = 0; s < numShots; s++) {
         const simShot = new engine.Simulator(numQubits);
-        simShot.run(cppCircuit);          // cppCircuit reused across shots
+        simShot.run(cppCircuitShots);
         const cppProbShot = simShot.get_probabilities();
         let r = Math.random();
         for (let i = 0; i < cppProbShot.size(); i++) {
@@ -156,7 +171,8 @@ function App() {
       setShotResults(events.map(state => ({ state: `|${state}⟩`, count: rawCounts[state] })));
     }
 
-    cppCircuit.delete();   // safe to delete after all shots are done
+    cppCircuitDisplay.delete();
+    cppCircuitShots.delete();
   }, [circuit, engine, shots, selectedQubit]);
 
   useEffect(() => {
@@ -165,8 +181,15 @@ function App() {
     }
   }, [measureStep, circuit, shots, isReady, engine, runCircuit]);
 
+  // Sync code input when circuit changes externally (drag-drop, etc.)
+  useEffect(() => {
+    if (!codeInputFocused.current) {
+      setCodeInput(circuitToCode(circuit));
+    }
+  }, [circuit]);
+
   // ---------------------------------------------------------------------------
-  // Auto-resize: keep at least 5 empty columns past the last occupied step
+  // Auto-resize
   // ---------------------------------------------------------------------------
   useEffect(() => {
     let highestOccupiedIndex = -1;
@@ -213,6 +236,15 @@ function App() {
             if (TWO_WIRE.includes(gateData.name)) {
               const cIndex = slotData.wireIndex;
               const tIndex = cIndex < prev.length - 1 ? cIndex + 1 : cIndex - 1;
+              // Validate: classical gates need a measured control wire;
+              //           quantum gates need an unmeasured control wire;
+              //           target must always be unmeasured.
+              const ctrlMeasured = prev[cIndex]?.some(c => c?.name === 'MEASURE') ?? false;
+              const tgtMeasured  = prev[tIndex]?.some(c => c?.name === 'MEASURE') ?? false;
+              const isClassical  = ['FF_x', 'FF_Z'].includes(gateData.name);
+              if (isClassical && !ctrlMeasured) return prev;
+              if (!isClassical && ctrlMeasured) return prev;
+              if (tgtMeasured) return prev;
               newCircuit[cIndex][slotData.stepIndex] = { name: gateData.name, role: 'control', targetWire: tIndex };
               newCircuit[tIndex][slotData.stepIndex] = { name: gateData.name, role: 'target', controlWire: cIndex };
             } else {
@@ -232,6 +264,14 @@ function App() {
 
             if (newWire === peerWire && newStep === oldStep) return prev;
             if (newStep !== oldStep) return prev;
+
+            // Validate control-wire constraint when the control node is being moved
+            if (role === 'control') {
+              const isMeasured = prev[newWire]?.some(c => c?.name === 'MEASURE') ?? false;
+              const isClassical = ['FF_x', 'FF_Z'].includes(gateName);
+              if (isClassical && !isMeasured) return prev;
+              if (!isClassical && isMeasured) return prev;
+            }
 
             newCircuit[oldWire][oldStep] = null;
             newCircuit[newWire][newStep] = {
@@ -379,8 +419,154 @@ function App() {
 
   const removeQubit = (indexToRemove) => {
     if (circuit.length <= 1) return;
-    setCircuit(circuit.filter((_, index) => index !== indexToRemove));
+    setCircuit(prev => {
+      // 1. For every remaining wire, null out cells whose 2-wire peer is the
+      //    deleted wire, and remap peer references for wires above the cut.
+      const cleaned = prev.map((wire, wi) => {
+        if (wi === indexToRemove) return wire; // will be filtered out below
+        return wire.map(cell => {
+          if (!cell || !TWO_WIRE.includes(cell.name)) return cell;
+          const peerKey = cell.role === 'control' ? 'targetWire' : 'controlWire';
+          const peer = cell[peerKey];
+          if (peer === indexToRemove) return null; // orphaned — delete it
+          // Remap: if peer was above the removed wire, shift index down
+          return peer > indexToRemove
+            ? { ...cell, [peerKey]: peer - 1 }
+            : cell;
+        });
+      });
+      // 2. Drop the deleted wire and compact the result.
+      return compactCircuit(cleaned.filter((_, i) => i !== indexToRemove));
+    });
   };
+
+  // ---------------------------------------------------------------------------
+  // Circuit code load
+  // ---------------------------------------------------------------------------
+  const loadFromCode = () => {
+    const parsed = parseCode(codeInput, circuit.length);
+    if (!parsed) {
+      setCodeError('Could not parse — check syntax e.g. h(0), cx(0,1), m(1)');
+      return;
+    }
+    setCodeError(null);
+    setCircuit(parsed);
+  };
+
+  const handleCodeKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      loadFromCode();
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Derived display data: which qubits are "measured" at the current sim point
+  // ---------------------------------------------------------------------------
+  const numQubits = circuit.length;
+
+  // A qubit is "measured" if it has a MEASURE gate that falls within the
+  // currently simulated range (measureStep === null means full circuit).
+  const measuredQubits = new Set(
+    measureStepPerWire
+      .map((mIdx, i) => {
+        if (mIdx === -1) return null;
+        if (measureStep === null || measureStep >= mIdx) return i;
+        return null;
+      })
+      .filter(i => i !== null)
+  );
+
+  const quantumQubits = Array.from({ length: numQubits }, (_, i) => i)
+    .filter(i => !measuredQubits.has(i));
+
+  // Heading label: "|q0 q2⟩" style, only quantum qubits
+  const quantumLabel = quantumQubits.length > 0
+    ? `|${quantumQubits.map(i => `q${i}`).join(' ')}⟩`
+    : null;
+
+  // Marginalized probabilities over quantum qubits only
+  const numQuantum = quantumQubits.length;
+  const margProbMap = new Map(); // label → probability
+
+  if (probabilities.length > 0 && numQuantum > 0) {
+    for (let i = 0; i < probabilities.length; i++) {
+      if (probabilities[i] === 0) continue;
+      let margIdx = 0;
+      for (let k = 0; k < numQuantum; k++) {
+        const qubit = quantumQubits[k];
+        const bit = (i >> (numQubits - 1 - qubit)) & 1;
+        margIdx = (margIdx << 1) | bit;
+      }
+      const label = margIdx.toString(2).padStart(numQuantum, '0');
+      margProbMap.set(label, (margProbMap.get(label) ?? 0) + probabilities[i]);
+    }
+  } else if (probabilities.length > 0 && numQuantum === 0) {
+    // All qubits measured — no quantum state to show
+  }
+
+  // Marginalized amplitude map (quantum qubit label → amplitude string)
+  const margAmpMap = new Map();
+  if (stateVector.length > 0 && numQuantum > 0) {
+    // Find the first state with non-zero probability to act as our "anchor" branch
+    let anchorIdx = -1;
+    for (let i = 0; i < probabilities.length; i++) {
+      if (probabilities[i] > 1e-8) {
+        anchorIdx = i;
+        break;
+      }
+    }
+
+    if (anchorIdx !== -1) {
+      // We only look at states that share the same measured qubit outcomes as the anchor
+      const isMatch = (index) => {
+        for (const mq of measuredQubits) {
+          if (((anchorIdx >> (numQubits - 1 - mq)) & 1) !== ((index >> (numQubits - 1 - mq)) & 1)) return false;
+        }
+        return true;
+      };
+
+      let branchProb = 0;
+      for (let i = 0; i < probabilities.length; i++) {
+        if (isMatch(i)) branchProb += probabilities[i];
+      }
+      const norm = branchProb > 0 ? Math.sqrt(branchProb) : 1;
+
+      for (let i = 0; i < stateVector.length; i++) {
+        if (isMatch(i)) {
+          let margIdx = 0;
+          for (let k = 0; k < numQuantum; k++) {
+            const qubit = quantumQubits[k];
+            const bit = (i >> (numQubits - 1 - qubit)) & 1;
+            margIdx = (margIdx << 1) | bit;
+          }
+          const label = margIdx.toString(2).padStart(numQuantum, '0');
+
+          const { real, imag } = stateVector[i];
+          let r = real / norm;
+          let im = imag / norm;
+          
+          if (Math.abs(r) < 1e-5) r = 0;
+          if (Math.abs(im) < 1e-5) im = 0;
+
+          if (Math.abs(r) > 1e-6 || Math.abs(im) > 1e-6) {
+            const sign = im >= 0 ? '+' : '-';
+            margAmpMap.set(label, `${r.toFixed(4)} ${sign} ${Math.abs(im).toFixed(4)}i`);
+          }
+        }
+      }
+    }
+  }
+
+  // P(qubit i = 1) for each measured qubit, derived from probabilities
+  const measuredQubitsProb = new Map(); // qubit index → P(=1)
+  for (const qi of measuredQubits) {
+    let p1 = 0;
+    for (let i = 0; i < probabilities.length; i++) {
+      if ((i >> (numQubits - 1 - qi)) & 1) p1 += probabilities[i];
+    }
+    measuredQubitsProb.set(qi, p1);
+  }
 
   // ---------------------------------------------------------------------------
   // Render
@@ -388,7 +574,7 @@ function App() {
   return (
     <div className="fixed inset-0 flex font-sans text-slate-300 bg-slate-950">
 
-      {/* Left sidebar — title, gates, shots */}
+      {/* Left sidebar */}
       <aside className="w-55 bg-slate-900 border-r border-slate-700/50 flex flex-col shrink-0 z-10">
         <div className="px-4 py-3 border-b border-slate-700/50">
           <h1 className="text-sm font-semibold text-white tracking-tight leading-tight">Circuit Visualizer</h1>
@@ -415,7 +601,7 @@ function App() {
           <div>
             <p className="text-[10px] font-semibold text-amber-500/70 uppercase tracking-widest mb-2">Classical ctrl</p>
             <div className="flex gap-2 justify-center">
-              {['CC_X', 'CC_Z'].map(gate => (
+              {['FF_x', 'FF_Z'].map(gate => (
                 <DraggableGate key={gate} gate={gate} />
               ))}
             </div>
@@ -471,17 +657,14 @@ function App() {
               </button>
 
               <div className="flex relative items-center py-2 px-1">
-                {/* Quantum segment — before (or no) MEASURE */}
                 {measureStepPerWire[wireIndex] === -1 ? (
                   <div className="absolute left-0 right-0 h-px bg-slate-600 z-0" />
                 ) : (
                   <>
-                    {/* Quantum portion: left edge → centre of MEASURE cell */}
                     <div
                       className="absolute left-0 h-px bg-slate-600 z-0"
                       style={{ width: `calc(${measureStepPerWire[wireIndex]} * (3.5rem + 0.5rem) + 2rem)` }}
                     />
-                    {/* Classical (double) portion: centre of MEASURE cell → right edge */}
                     <div
                       className="absolute right-0 z-0"
                       style={{
@@ -511,7 +694,6 @@ function App() {
                           {cell.role === 'control' && (
                             <>
                               {(cell.name === 'CNOT' || cell.name === 'CZ') ? (
-                                /* Quantum vertical: single slate line */
                                 <div
                                   className="absolute w-px bg-slate-400 z-0 pointer-events-none"
                                   style={{
@@ -522,7 +704,6 @@ function App() {
                                   }}
                                 />
                               ) : (
-                                /* Classical vertical: double amber line */
                                 <div
                                   className="absolute z-0 pointer-events-none"
                                   style={{
@@ -601,56 +782,71 @@ function App() {
                 </div>
               )}
 
-              {classicalBits.some(b => b !== -1) && (
+              {/* Classical bits: show P(=1) from probability array */}
+              {measuredQubits.size > 0 && (
                 <div className="px-4 py-3">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Classical Bits</p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Measured</p>
+                  <div className="flex flex-col gap-2 font-mono text-xs">
+                    {[...measuredQubits].map(i => {
+                      const p1 = measuredQubitsProb.get(i) ?? 0;
+                      const p0 = 1 - p1;
+                      return (
+                        <div key={i}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-slate-400">q[{i}]</span>
+                            <span className="text-slate-500 text-[10px]">
+                              <span className="text-slate-300">{(p0 * 100).toFixed(1)}%</span> |0⟩ ·{' '}
+                              <span className="text-amber-300">{(p1 * 100).toFixed(1)}%</span> |1⟩
+                            </span>
+                          </div>
+                          {/* Mini probability bar: left=|0⟩ slate, right=|1⟩ amber */}
+                          <div className="h-1 w-full bg-slate-700/60 rounded-full overflow-hidden flex">
+                            <div className="h-full bg-slate-400/70 rounded-l-full" style={{ width: `${p0 * 100}%` }} />
+                            <div className="h-full bg-amber-500/70 rounded-r-full" style={{ width: `${p1 * 100}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Probabilities: marginalized to quantum qubits */}
+              {margProbMap.size > 0 && (
+                <div className="px-4 py-3">
+                  <div className="flex items-baseline gap-1.5 mb-2.5">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Probabilities</p>
+                    {quantumLabel && (
+                      <span className="text-[10px] text-slate-500 font-mono">{quantumLabel}</span>
+                    )}
+                  </div>
                   <div className="flex flex-col gap-1.5 font-mono text-xs">
-                    {classicalBits.map((bit, i) => bit === -1 ? null : (
-                      <div key={i} className="flex justify-between items-center">
-                        <span className="text-slate-400">q[{i}]</span>
-                        <span className={`font-semibold tabular-nums px-1.5 py-0.5 rounded text-[11px] ${bit === 1 ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700/50 text-slate-300'}`}>
-                          {bit}
-                        </span>
+                    {[...margProbMap.entries()].map(([label, prob]) => (
+                      <div key={`prob-${label}`} className="flex justify-between items-center">
+                        <span className="text-slate-400">|{label}⟩</span>
+                        <span className="text-white font-medium tabular-nums">{(prob * 100).toFixed(2)}%</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {probabilities.length > 0 && (
+              {/* Amplitudes: marginalized to quantum qubits */}
+              {margAmpMap.size > 0 && (
                 <div className="px-4 py-3">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Probabilities</p>
-                  <div className="flex flex-col gap-1.5 font-mono text-xs">
-                    {probabilities.map((prob, index) => {
-                      const numQubits = Math.log2(probabilities.length);
-                      const label = index.toString(2).padStart(numQubits, '0');
-                      if (prob === 0) return null;
-                      return (
-                        <div key={`prob-${index}`} className="flex justify-between items-center">
-                          <span className="text-slate-400">|{label}⟩</span>
-                          <span className="text-white font-medium tabular-nums">{(prob * 100).toFixed(2)}%</span>
-                        </div>
-                      );
-                    })}
+                  <div className="flex items-baseline gap-1.5 mb-2.5">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Amplitudes</p>
+                    {quantumLabel && (
+                      <span className="text-[10px] text-slate-500 font-mono">{quantumLabel}</span>
+                    )}
                   </div>
-                </div>
-              )}
-
-              {stateVector.length > 0 && (
-                <div className="px-4 py-3">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Amplitudes</p>
                   <div className="flex flex-col gap-1.5 font-mono text-[11px]">
-                    {stateVector.map((amp, index) => {
-                      const numQubits = Math.log2(stateVector.length);
-                      const label = index.toString(2).padStart(numQubits, '0');
-                      if (amp === '0.0000 + 0.0000i' || amp === '0.0000 - 0.0000i') return null;
-                      return (
-                        <div key={`amp-${index}`} className="flex justify-between items-center gap-2">
-                          <span className="text-slate-400 shrink-0">|{label}⟩</span>
-                          <span className="text-slate-200 font-medium tabular-nums text-right">{amp}</span>
-                        </div>
-                      );
-                    })}
+                    {[...margAmpMap.entries()].map(([label, amp]) => (
+                      <div key={`amp-${label}`} className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 shrink-0">|{label}⟩</span>
+                        <span className="text-slate-200 font-medium tabular-nums text-right">{amp}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -659,6 +855,7 @@ function App() {
                 <MeasurementHistogram data={shotResults} shots={shots} />
               </div>
 
+              {/* Shots */}
               <div className="px-4 py-3">
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Shots</p>
                 <input
@@ -669,6 +866,35 @@ function App() {
                   min="1"
                   max="100000"
                 />
+              </div>
+
+              {/* Circuit code */}
+              <div className="px-4 py-3">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Circuit Code</p>
+                <textarea
+                  value={codeInput}
+                  onChange={(e) => { setCodeInput(e.target.value); setCodeError(null); }}
+                  onFocus={() => { codeInputFocused.current = true; }}
+                  onBlur={() => { codeInputFocused.current = false; }}
+                  onKeyDown={handleCodeKeyDown}
+                  rows={3}
+                  spellCheck={false}
+                  placeholder="h(0), cx(0,1), m(1)"
+                  className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 text-[11px] font-mono focus:outline-none focus:border-slate-500 resize-none leading-relaxed"
+                />
+                {codeError && (
+                  <p className="text-[10px] text-red-400 mt-1">{codeError}</p>
+                )}
+                <button
+                  onClick={loadFromCode}
+                  className="mt-1.5 w-full text-[10px] font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded py-1 transition-colors"
+                >
+                  Load ↵
+                </button>
+                <p className="text-[9px] text-slate-600 mt-1.5 leading-relaxed">
+                  Gates: h x y z t m cx cz ffx ffz<br />
+                  e.g. <span className="text-slate-500">h(0), cx(0,1), m(1)</span>
+                </p>
               </div>
             </>
           )}

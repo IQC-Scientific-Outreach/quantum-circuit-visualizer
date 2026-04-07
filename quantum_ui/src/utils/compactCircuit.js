@@ -16,7 +16,7 @@ export const compactCircuit = (oldCircuit) => {
         const cell = oldCircuit[wire][step];
         if (!cell) continue;
   
-        const TWO_WIRE = ['CNOT', 'CZ', 'CC_X', 'CC_Z'];
+        const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
         if (TWO_WIRE.includes(cell.name)) {
           const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
   

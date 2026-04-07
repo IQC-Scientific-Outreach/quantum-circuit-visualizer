@@ -3,54 +3,54 @@
  */
 const GateVisual = ({ name }) => {
   if (name === 'CNOT') {
+    // Controlled-X: dot control, square-X target
     return (
       <svg className="w-8 h-12" viewBox="0 0 24 32" fill="none" stroke="currentColor">
         <circle cx="12" cy="6" r="3" fill="currentColor" stroke="none" />
-        <line x1="12" y1="6" x2="12" y2="21" strokeWidth="1.5" />
-        <circle cx="12" cy="26" r="5" strokeWidth="1.5" />
-        <path d="M12 21v10M7 26h10" strokeWidth="1.5" />
+        <line x1="12" y1="6" x2="12" y2="20" strokeWidth="1.5" />
+        <rect x="5" y="20" width="14" height="10" rx="1.5" strokeWidth="1.5" />
+        <text x="12" y="28.5" textAnchor="middle" fontSize="8" fill="currentColor"
+              stroke="none" fontWeight="bold" fontFamily="monospace">X</text>
       </svg>
     );
   }
 
   if (name === 'CZ') {
+    // Controlled-Z: dot control, Z-box target
     return (
       <svg className="w-8 h-12" viewBox="0 0 24 32" fill="none" stroke="currentColor">
-        {/* control dot */}
         <circle cx="12" cy="6" r="3" fill="currentColor" stroke="none" />
-        <line x1="12" y1="6" x2="12" y2="25" strokeWidth="1.5" />
-        {/* target dot */}
-        <circle cx="12" cy="26" r="3" fill="currentColor" stroke="none" />
+        <line x1="12" y1="6" x2="12" y2="20" strokeWidth="1.5" />
+        <rect x="5" y="20" width="14" height="10" rx="1.5" strokeWidth="1.5" />
+        <text x="12" y="28.5" textAnchor="middle" fontSize="8" fill="currentColor"
+              stroke="none" fontWeight="bold" fontFamily="monospace">Z</text>
       </svg>
     );
   }
 
-  if (name === 'CC_X') {
+  if (name === 'FF_x') {
+    // Classically-controlled X: filled-square control, square-X target
     return (
       <svg className="w-8 h-12" viewBox="0 0 24 32" fill="none" stroke="currentColor">
-        {/* Classical control: filled square */}
         <rect x="8" y="2" width="8" height="7" rx="1" fill="currentColor" stroke="none" />
-        {/* Double-line classical wire */}
-        <line x1="10" y1="9" x2="10" y2="21" strokeWidth="1.2" strokeDasharray="3,2" />
-        <line x1="14" y1="9" x2="14" y2="21" strokeWidth="1.2" strokeDasharray="3,2" />
-        {/* ⊕ target */}
-        <circle cx="12" cy="26" r="5" strokeWidth="1.5" />
-        <path d="M12 21v10M7 26h10" strokeWidth="1.5" />
+        <line x1="10" y1="9" x2="10" y2="20" strokeWidth="1.2" />
+        <line x1="14" y1="9" x2="14" y2="20" strokeWidth="1.2" />
+        <rect x="5" y="20" width="14" height="10" rx="1.5" strokeWidth="1.5" />
+        <text x="12" y="28.5" textAnchor="middle" fontSize="8" fill="currentColor"
+              stroke="none" fontWeight="bold" fontFamily="monospace">X</text>
       </svg>
     );
   }
 
-  if (name === 'CC_Z') {
+  if (name === 'FF_Z') {
+    // Classically-controlled Z: filled-square control, Z-box target
     return (
       <svg className="w-8 h-12" viewBox="0 0 24 32" fill="none" stroke="currentColor">
-        {/* Classical control: filled square */}
         <rect x="8" y="2" width="8" height="7" rx="1" fill="currentColor" stroke="none" />
-        {/* Double-line classical wire */}
-        <line x1="10" y1="9" x2="10" y2="21" strokeWidth="1.2" strokeDasharray="3,2" />
-        <line x1="14" y1="9" x2="14" y2="21" strokeWidth="1.2" strokeDasharray="3,2" />
-        {/* Z box target */}
-        <rect x="6" y="21" width="12" height="9" rx="1" strokeWidth="1.5" />
-        <text x="12" y="29" textAnchor="middle" fontSize="7" fill="currentColor"
+        <line x1="10" y1="9" x2="10" y2="20" strokeWidth="1.2" />
+        <line x1="14" y1="9" x2="14" y2="20" strokeWidth="1.2" />
+        <rect x="5" y="20" width="14" height="10" rx="1.5" strokeWidth="1.5" />
+        <text x="12" y="28.5" textAnchor="middle" fontSize="8" fill="currentColor"
               stroke="none" fontWeight="bold" fontFamily="monospace">Z</text>
       </svg>
     );

@@ -2,15 +2,15 @@ import { useRef, useEffect, useState } from 'react';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 
 /**
- * Renders one node of a placed two-wire gate: CNOT, CZ, CC_X, or CC_Z.
+ * Renders one node of a placed two-wire gate: CNOT, CZ, FF_x, or FF_Z.
  *
  * Quantum 2q (CNOT, CZ) — slate color
  *   CNOT  control: filled circle   target: ⊕
  *   CZ    control: filled circle   target: filled circle
  *
- * Classically-controlled (CC_X, CC_Z) — amber color
- *   CC_X  control: filled square   target: ⊕
- *   CC_Z  control: filled square   target: Z-box
+ * Classically-controlled (FF_x, FF_Z) — amber color
+ *   FF_x  control: filled square   target: ⊕
+ *   FF_Z  control: filled square   target: Z-box
  */
 const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
   const ref = useRef(null);
@@ -57,7 +57,7 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
     return () => { cleanupDrag(); cleanupDrop(); };
   }, [cell, wireIndex, stepIndex]);
 
-  const isClassical = cell.name === 'CC_X' || cell.name === 'CC_Z';
+  const isClassical = cell.name === 'FF_x' || cell.name === 'FF_Z';
 
   const baseClasses = `absolute w-full h-full flex items-center justify-center cursor-grab transition-all z-20
     ${isDragging       ? 'opacity-0'                              : 'hover:scale-110'}
@@ -73,32 +73,33 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
         <div className="w-3.5 h-3.5 rounded-full bg-slate-300" />
       )}
       {cell.role === 'control' && isClassical && (
-        // CC_X or CC_Z: classical filled square
+        // FF_x or FF_Z: classical filled square
         <div className="w-3.5 h-3.5 rounded-sm bg-amber-400" />
       )}
 
       {/* ── Target nodes ── */}
+      {/* CNOT target: square with X (slate) */}
       {cell.role === 'target' && cell.name === 'CNOT' && (
-        <svg className="w-8 h-8 text-slate-300 bg-slate-900 rounded-full"
-             viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
-          <path d="M12 2v20M2 12h20" strokeWidth="1.5" />
-        </svg>
+        <div className="w-9 h-9 border-2 border-slate-400/80 bg-slate-800/60 rounded flex items-center justify-center">
+          <span className="text-slate-200 text-base font-bold leading-none select-none">X</span>
+        </div>
       )}
+      {/* CZ target: Z-box (slate) */}
       {cell.role === 'target' && cell.name === 'CZ' && (
-        // CZ: target is also a filled dot (symmetric)
-        <div className="w-3.5 h-3.5 rounded-full bg-slate-300" />
+        <div className="w-9 h-9 border border-slate-400/70 bg-slate-500/10 rounded flex items-center justify-center">
+          <span className="text-slate-300 text-base font-bold leading-none select-none">Z</span>
+        </div>
       )}
-      {cell.role === 'target' && cell.name === 'CC_X' && (
-        <svg className="w-8 h-8 text-amber-300 bg-slate-900 rounded-full"
-             viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
-          <path d="M12 2v20M2 12h20" strokeWidth="1.5" />
-        </svg>
+      {/* FF_x target: square with X (amber) */}
+      {cell.role === 'target' && cell.name === 'FF_x' && (
+        <div className="w-9 h-9 border-2 border-amber-400/80 bg-amber-900/30 rounded flex items-center justify-center">
+          <span className="text-amber-200 text-base font-bold leading-none select-none">X</span>
+        </div>
       )}
-      {cell.role === 'target' && cell.name === 'CC_Z' && (
+      {/* FF_Z target: Z-box (amber) — unchanged */}
+      {cell.role === 'target' && cell.name === 'FF_Z' && (
         <div className="w-9 h-9 border border-amber-400/70 bg-amber-500/10 rounded flex items-center justify-center">
-          <span className="text-amber-300 text-base font-bold leading-none">Z</span>
+          <span className="text-amber-300 text-base font-bold leading-none select-none">Z</span>
         </div>
       )}
 
