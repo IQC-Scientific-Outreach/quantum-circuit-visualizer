@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 
 import initQuantumEngine from './wasm/quantum_engine.js'
@@ -708,6 +709,12 @@ function App() {
         <div className="px-4 py-3 border-b border-slate-700/50">
           <h1 className="text-sm font-semibold text-white tracking-tight leading-tight">Circuit Visualizer</h1>
           {!isReady && <p className="text-[10px] text-amber-400 animate-pulse mt-0.5">Initializing…</p>}
+          <Link
+            to="/questions"
+            className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors mt-1.5 block"
+          >
+            Practice Questions →
+          </Link>
         </div>
 
         <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
