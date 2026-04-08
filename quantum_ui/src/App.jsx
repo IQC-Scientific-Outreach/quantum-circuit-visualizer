@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -637,30 +637,68 @@ function App() {
 
   // Marginalized amplitude map (quantum qubit label → amplitude string)
   const margAmpMap = new Map();
-  if (stateVector.length > 0 && numQuantum > 0) {
-    // Find the first state with non-zero probability to act as our "anchor" branch
-    let anchorIdx = -1;
+  let measurementLabel = null;
+
+  const measuredQubitsKey = Array.from(measuredQubits).sort((a, b) => a - b).join(',');
+
+  const chosenOutcome = useMemo(() => {
+    if (measuredQubitsKey === '' || probabilities.length === 0) return null;
+    
+    const outcomeProbs = new Map();
+    const measuredArr = measuredQubitsKey.split(',').map(Number);
+    
     for (let i = 0; i < probabilities.length; i++) {
       if (probabilities[i] > 1e-8) {
-        anchorIdx = i;
-        break;
+        const bits = measuredArr.map(q => (i >> (numQubits - 1 - q)) & 1).join('');
+        outcomeProbs.set(bits, (outcomeProbs.get(bits) ?? 0) + probabilities[i]);
       }
     }
 
-    if (anchorIdx !== -1) {
-      // We only look at states that share the same measured qubit outcomes as the anchor
+    let maxProb = -1;
+    let likelyOutcomes = [];
+    for (const [bits, prob] of outcomeProbs.entries()) {
+      if (prob > maxProb + 1e-8) {
+        maxProb = prob;
+        likelyOutcomes = [bits];
+      } else if (Math.abs(prob - maxProb) <= 1e-8) {
+        likelyOutcomes.push(bits);
+      }
+    }
+
+    if (likelyOutcomes.length > 0) {
+      return {
+        bits: likelyOutcomes[Math.floor(Math.random() * likelyOutcomes.length)],
+        prob: maxProb
+      };
+    }
+    return null;
+  }, [probabilities, measuredQubitsKey, numQubits]);
+
+  if (stateVector.length > 0 && numQuantum > 0) {
+    if (chosenOutcome !== null) {
+      const measuredArr = measuredQubitsKey.split(',').map(Number);
+      const qLabels = measuredArr.map(q => `q${q}`).join(' ');
+      measurementLabel = `|${qLabels}⟩ = |${chosenOutcome.bits}⟩`;
+
+      const norm = chosenOutcome.prob > 0 ? Math.sqrt(chosenOutcome.prob) : 1;
       const isMatch = (index) => {
-        for (const mq of measuredQubits) {
-          if (((anchorIdx >> (numQubits - 1 - mq)) & 1) !== ((index >> (numQubits - 1 - mq)) & 1)) return false;
-        }
-        return true;
+        const bits = measuredArr.map(q => (index >> (numQubits - 1 - q)) & 1).join('');
+        return bits === chosenOutcome.bits;
       };
 
-      let branchProb = 0;
-      for (let i = 0; i < probabilities.length; i++) {
-        if (isMatch(i)) branchProb += probabilities[i];
+      // Factor out the global phase based on the first non-zero amplitude in this branch
+      let phaseR = 1, phaseI = 0;
+      for (let i = 0; i < stateVector.length; i++) {
+        if (isMatch(i)) {
+          const { real, imag } = stateVector[i];
+          const mag = Math.sqrt(real * real + imag * imag);
+          if (mag > 1e-6) {
+            phaseR = real / mag;
+            phaseI = imag / mag;
+            break;
+          }
+        }
       }
-      const norm = branchProb > 0 ? Math.sqrt(branchProb) : 1;
 
       for (let i = 0; i < stateVector.length; i++) {
         if (isMatch(i)) {
@@ -673,8 +711,12 @@ function App() {
           const label = margIdx.toString(2).padStart(numQuantum, '0');
 
           const { real, imag } = stateVector[i];
-          let r = real / norm;
-          let im = imag / norm;
+          // Rotate by the complex conjugate of the global phase
+          const rotatedReal = real * phaseR + imag * phaseI;
+          const rotatedImag = imag * phaseR - real * phaseI;
+
+          let r = rotatedReal / norm;
+          let im = rotatedImag / norm;
           
           if (Math.abs(r) < 1e-5) r = 0;
           if (Math.abs(im) < 1e-5) im = 0;
@@ -683,6 +725,45 @@ function App() {
             const sign = im >= 0 ? '+' : '-';
             margAmpMap.set(label, `${r.toFixed(4)} ${sign} ${Math.abs(im).toFixed(4)}i`);
           }
+        }
+      }
+    } else if (measuredQubits.size === 0) {
+      // No measured qubits, just show the pure state
+      
+      // Factor out the global phase
+      let phaseR = 1, phaseI = 0;
+      for (let i = 0; i < stateVector.length; i++) {
+        const { real, imag } = stateVector[i];
+        const mag = Math.sqrt(real * real + imag * imag);
+        if (mag > 1e-6) {
+          phaseR = real / mag;
+          phaseI = imag / mag;
+          break;
+        }
+      }
+
+      for (let i = 0; i < stateVector.length; i++) {
+        let margIdx = 0;
+        for (let k = 0; k < numQuantum; k++) {
+          const qubit = quantumQubits[k];
+          const bit = (i >> (numQubits - 1 - qubit)) & 1;
+          margIdx = (margIdx << 1) | bit;
+        }
+        const label = margIdx.toString(2).padStart(numQuantum, '0');
+
+        const { real, imag } = stateVector[i];
+        const rotatedReal = real * phaseR + imag * phaseI;
+        const rotatedImag = imag * phaseR - real * phaseI;
+
+        let r = rotatedReal;
+        let im = rotatedImag;
+        
+        if (Math.abs(r) < 1e-5) r = 0;
+        if (Math.abs(im) < 1e-5) im = 0;
+
+        if (Math.abs(r) > 1e-6 || Math.abs(im) > 1e-6) {
+          const sign = im >= 0 ? '+' : '-';
+          margAmpMap.set(label, `${r.toFixed(4)} ${sign} ${Math.abs(im).toFixed(4)}i`);
         }
       }
     }
@@ -998,10 +1079,17 @@ function App() {
               {/* Amplitudes: marginalized to quantum qubits */}
               {margAmpMap.size > 0 && (
                 <div className="px-4 py-3">
-                  <div className="flex items-baseline gap-1.5 mb-2.5">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Amplitudes</p>
-                    {quantumLabel && (
-                      <span className="text-[10px] text-slate-500 font-mono">{quantumLabel}</span>
+                  <div className="flex flex-col gap-1 mb-2.5">
+                    <div className="flex items-baseline gap-1.5">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Amplitudes</p>
+                      {quantumLabel && (
+                        <span className="text-[10px] text-slate-500 font-mono">{quantumLabel}</span>
+                      )}
+                    </div>
+                    {measurementLabel && (
+                      <p className="text-[9px] text-amber-500/80 font-mono">
+                        (given {measurementLabel})
+                      </p>
                     )}
                   </div>
                   <div className="flex flex-col gap-1.5 font-mono text-[11px]">
