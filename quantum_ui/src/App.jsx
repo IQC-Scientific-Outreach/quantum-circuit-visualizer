@@ -256,27 +256,40 @@ function App() {
           setCircuit(prev => {
             const newCircuit = prev.map(wire => [...wire]);
             const numW = prev.length;
+            const step = slotData.stepIndex;
+            let needsInsert = false;
             for (let w = 0; w < numW; w++) {
-              newCircuit[w][slotData.stepIndex] = { name: 'BARRIER', topWire: 0, bottomWire: numW - 1 };
+              if (newCircuit[w][step] !== null) { needsInsert = true; break; }
+            }
+            if (needsInsert) {
+              newCircuit.forEach(wire => wire.splice(step, 0, null));
+            }
+            for (let w = 0; w < numW; w++) {
+              newCircuit[w][step] = { name: 'BARRIER', topWire: 0, bottomWire: numW - 1 };
             }
             return compactCircuit(newCircuit);
           });
           return;
         }
 
-        // Whole-barrier move — only place if destination column is free for all wires in span
+        // Whole-barrier move
         if (gateData.type === 'barrier' && slotData.type === 'slot') {
           setCircuit(prev => {
             const newCircuit = prev.map(wire => [...wire]);
             const { topWire, bottomWire, stepIndex: oldStep } = gateData;
             const newStep = slotData.stepIndex;
             if (oldStep === newStep) return prev;
-            // Check destination is clear (ignoring the barrier's own cells)
-            for (let w = topWire; w <= bottomWire; w++) {
-              const occupant = newCircuit[w][newStep];
-              if (occupant && !(occupant.name === 'BARRIER' && occupant.topWire === topWire && occupant.bottomWire === bottomWire)) return prev;
-            }
+            
             for (let w = topWire; w <= bottomWire; w++) newCircuit[w][oldStep] = null;
+            
+            let needsInsert = false;
+            for (let w = topWire; w <= bottomWire; w++) {
+              if (newCircuit[w][newStep] !== null) { needsInsert = true; break; }
+            }
+            if (needsInsert) {
+              newCircuit.forEach(wire => wire.splice(newStep, 0, null));
+            }
+
             for (let w = topWire; w <= bottomWire; w++) {
               newCircuit[w][newStep] = { name: 'BARRIER', topWire, bottomWire };
             }
@@ -304,6 +317,15 @@ function App() {
 
             // Clear old span
             for (let w = topWire; w <= bottomWire; w++) newCircuit[w][barrStep] = null;
+
+            let needsInsert = false;
+            for (let w = newTop; w <= newBottom; w++) {
+              if (newCircuit[w][barrStep] !== null) { needsInsert = true; break; }
+            }
+            if (needsInsert) {
+              newCircuit.forEach(wire => wire.splice(barrStep, 0, null));
+            }
+
             // Write new span
             for (let w = newTop; w <= newBottom; w++) {
               newCircuit[w][barrStep] = { name: 'BARRIER', topWire: newTop, bottomWire: newBottom };
@@ -316,9 +338,12 @@ function App() {
         if (gateData.type === 'gate' && slotData.type === 'slot') {
           setCircuit(prev => {
             const newCircuit = prev.map(wire => [...wire]);
+            let targetWires = [];
+            let cIndex, tIndex, c1, c2;
+
             if (TWO_WIRE.includes(gateData.name)) {
-              const cIndex = slotData.wireIndex;
-              const tIndex = cIndex < prev.length - 1 ? cIndex + 1 : cIndex - 1;
+              cIndex = slotData.wireIndex;
+              tIndex = cIndex < prev.length - 1 ? cIndex + 1 : cIndex - 1;
               if (tIndex < 0 || tIndex >= prev.length) return prev;
               // Validate: classical gates need a measured control wire;
               //           quantum gates need an unmeasured control wire;
@@ -329,25 +354,47 @@ function App() {
               if (isClassical && !ctrlMeasured) return prev;
               if (!isClassical && ctrlMeasured) return prev;
               if (tgtMeasured) return prev;
-              newCircuit[cIndex][slotData.stepIndex] = { name: gateData.name, role: 'control', targetWire: tIndex };
-              newCircuit[tIndex][slotData.stepIndex] = { name: gateData.name, role: 'target', controlWire: cIndex };
+
+              targetWires = [cIndex, tIndex];
             } else if (gateData.name === 'TOFFOLI') {
-            const c1 = slotData.wireIndex;
+              c1 = slotData.wireIndex;
               if (prev.length < 3) return prev;
-            const c2 = c1 + 1 < prev.length ? c1 + 1 : c1 - 1;
-            const tIndex = [c1 + 2, c1 - 1, c1 - 2].find(w => w >= 0 && w < prev.length && w !== c2) ?? 
-                           [...Array(prev.length).keys()].find(w => w !== c1 && w !== c2);
+              c2 = c1 + 1 < prev.length ? c1 + 1 : c1 - 1;
+              tIndex = [c1 + 2, c1 - 1, c1 - 2].find(w => w >= 0 && w < prev.length && w !== c2) ?? 
+                             [...Array(prev.length).keys()].find(w => w !== c1 && w !== c2);
 
               const c1Measured = prev[c1]?.some(c => c?.name === 'MEASURE') ?? false;
               const c2Measured = prev[c2]?.some(c => c?.name === 'MEASURE') ?? false;
               const tgtMeasured  = prev[tIndex]?.some(c => c?.name === 'MEASURE') ?? false;
               if (c1Measured || c2Measured || tgtMeasured) return prev;
 
-              newCircuit[c1][slotData.stepIndex] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
-              newCircuit[c2][slotData.stepIndex] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
-              newCircuit[tIndex][slotData.stepIndex] = { name: 'TOFFOLI', role: 'target', controls: [c1, c2], targetWire: tIndex };
+              targetWires = [c1, c2, tIndex];
             } else {
-              newCircuit[slotData.wireIndex][slotData.stepIndex] = { name: gateData.name };
+              targetWires = [slotData.wireIndex];
+            }
+
+            const step = slotData.stepIndex;
+            let needsInsert = false;
+            for (const w of targetWires) {
+              if (newCircuit[w][step] !== null) {
+                needsInsert = true;
+                break;
+              }
+            }
+
+            if (needsInsert) {
+              newCircuit.forEach(wire => wire.splice(step, 0, null));
+            }
+
+            if (TWO_WIRE.includes(gateData.name)) {
+              newCircuit[cIndex][step] = { name: gateData.name, role: 'control', targetWire: tIndex };
+              newCircuit[tIndex][step] = { name: gateData.name, role: 'target', controlWire: cIndex };
+            } else if (gateData.name === 'TOFFOLI') {
+              newCircuit[c1][step] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
+              newCircuit[c2][step] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
+              newCircuit[tIndex][step] = { name: 'TOFFOLI', role: 'target', controls: [c1, c2], targetWire: tIndex };
+            } else {
+              newCircuit[slotData.wireIndex][step] = { name: gateData.name };
             }
             return compactCircuit(newCircuit);
           });
@@ -638,6 +685,18 @@ function App() {
       if (action === 'shrinkTop')    newTop    = Math.min(newTop + 1, newBottom);
       if (action === 'extendBottom') newBottom = Math.min(prev.length - 1, newBottom + 1);
       if (action === 'shrinkBottom') newBottom = Math.max(newBottom - 1, newTop);
+
+      let needsInsert = false;
+      for (let w = newTop; w <= newBottom; w++) {
+        if (newCircuit[w][stepIndex] !== null) {
+          needsInsert = true;
+          break;
+        }
+      }
+
+      if (needsInsert) {
+        newCircuit.forEach(wire => wire.splice(stepIndex, 0, null));
+      }
 
       for (let w = newTop; w <= newBottom; w++) {
         newCircuit[w][stepIndex] = { name: 'BARRIER', topWire: newTop, bottomWire: newBottom };
