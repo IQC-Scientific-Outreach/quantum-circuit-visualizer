@@ -3,7 +3,9 @@
 #include <stdexcept>
 using namespace std;
 
-Simulator::Simulator(int n) : num_qubits(n), q_state(n), classical_bits(n, -1) {}
+Simulator::Simulator(int n) : num_qubits(n), q_state(n), classical_bits(n, -1) {
+    if (n > MAX_QUBITS) throw invalid_argument("Maximum supported qubit count is " + to_string(MAX_QUBITS));
+}
 
 void Simulator::run(const vector<Instruction>& circuit) {
     fill(classical_bits.begin(), classical_bits.end(), -1);

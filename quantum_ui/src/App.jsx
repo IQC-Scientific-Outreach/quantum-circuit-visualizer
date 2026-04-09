@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 
 import initQuantumEngine from './wasm/quantum_engine.js'
-import { SINGLE_QUBIT_GATES } from './constants';
+import { SINGLE_QUBIT_GATES, MAX_QUBITS } from './constants';
 import { compactCircuit } from './utils/compactCircuit';
 import { simulateShots } from './utils/simulateShots';
 import { circuitToCode, parseCode } from './utils/circuitCode';
@@ -694,6 +694,7 @@ function App() {
   };
 
   const addQubit = () => {
+    if (circuit.length >= MAX_QUBITS) return;
     const numSteps = circuit[0].length;
     setCircuit([...circuit, Array(numSteps).fill(null)]);
   };
@@ -743,6 +744,10 @@ function App() {
     const parsed = parseCode(codeInput, circuit.length);
     if (!parsed) {
       setCodeError('Could not parse — check syntax e.g. h(0), cx(0,1), m(1)');
+      return;
+    }
+    if (parsed.length > MAX_QUBITS) {
+      setCodeError(`Maximum ${MAX_QUBITS} qubits supported`);
       return;
     }
     setCodeError(null);
@@ -1186,7 +1191,8 @@ function App() {
           <div className="mt-4">
             <button
               onClick={addQubit}
-              className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-white transition-colors"
+              disabled={circuit.length >= MAX_QUBITS}
+              className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-slate-500"
             >
               <Plus size={13} /> Add Qubit
             </button>

@@ -1,4 +1,6 @@
 #pragma once
+
+constexpr int MAX_QUBITS = 10;
 #include <complex>
 #include <vector>
 #include <array>

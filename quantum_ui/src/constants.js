@@ -1,3 +1,5 @@
+export const MAX_QUBITS = 10;
+
 export const SINGLE_QUBIT_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
 export const TWO_WIRE_GATES     = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
 export const AVAILABLE_GATES    = [...SINGLE_QUBIT_GATES, ...TWO_WIRE_GATES];
