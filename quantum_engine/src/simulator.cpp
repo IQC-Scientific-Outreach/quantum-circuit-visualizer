@@ -62,20 +62,45 @@ vector<double> Simulator::get_statevector() const {
     return flat;
 }
 
+double Simulator::get_expectation_x(int target_qubit) const {
+    return get_expectation_arbitrary(target_qubit, GateRegistry::base_gates.at("X"));
+}
+
+double Simulator::get_expectation_y(int target_qubit) const {
+    return get_expectation_arbitrary(target_qubit, GateRegistry::base_gates.at("Y"));
+}
+
 double Simulator::get_expectation_z(int target_qubit) const {
+    return get_expectation_arbitrary(target_qubit, GateRegistry::base_gates.at("Z"));
+}
+
+
+
+
+double Simulator::get_expectation_arbitrary(int target_qubit, const Matrix2x2& matrix) const {
+    
     const auto& state = q_state.get_state();
     int num_states = state.size();
 
     int nq = 0;
-    while ((1 << nq) < num_states) nq++;
+    while ((1 << nq) < num_states) nq++; // num of qubits
 
-    double exp_val = 0.0;
+    complex<double> exp_val = 0.0;
+    int mask = 1 << (nq - 1 - target_qubit); // Mask to isolate target qubit bit
+
     for (int i = 0; i < num_states; i++) {
-        int bit = (i >> (nq - 1 - target_qubit)) & 1;
-        double p = norm(state[i]);
-        exp_val += (bit == 0) ? p : -p;
+        if ((i & mask) == 0) {
+            int j = i | mask; 
+            
+            complex<double> ci = state[i];
+            complex<double> cj = state[j];
+            
+            // <psi| M |psi> = ci* (m00*ci + m01*cj) + cj* (m10*ci + m11*cj)
+            exp_val += conj(ci) * (matrix[0] * ci + matrix[1] * cj) + 
+                       conj(cj) * (matrix[2] * ci + matrix[3] * cj);
+        }
     }
-    return exp_val;
+    return real(exp_val);
 }
 
 vector<int> Simulator::get_classical_bits() const {

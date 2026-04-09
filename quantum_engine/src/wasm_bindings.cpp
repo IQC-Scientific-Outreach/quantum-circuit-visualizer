@@ -20,5 +20,7 @@ EMSCRIPTEN_BINDINGS(quantum_module) {
         .function("get_probabilities",  &Simulator::get_probabilities)
         .function("get_statevector",    &Simulator::get_statevector)
         .function("get_expectation_z",  &Simulator::get_expectation_z)
+        .function("get_expectation_y",  &Simulator::get_expectation_y)
+        .function("get_expectation_x",  &Simulator::get_expectation_x)
         .function("get_classical_bits", &Simulator::get_classical_bits);
 }

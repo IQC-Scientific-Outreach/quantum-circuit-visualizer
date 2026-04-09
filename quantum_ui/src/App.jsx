@@ -36,6 +36,8 @@ function App() {
   // key: `${stepIndex}-${topWire}-${bottomWire}` — shared hover across all barrier wire slots
   const [hoveredBarrier, setHoveredBarrier] = useState(null);
   const [expectationValue, setExpectationValue] = useState(null);
+  const [expectationValueX, setExpectationValueX] = useState(null);
+  const [expectationValueY, setExpectationValueY] = useState(null);
   const [, setClassicalBits] = useState([]);
 
   // Circuit code input state
@@ -141,9 +143,19 @@ function App() {
     }
     setStateVector(stateArr);
 
-    if (selectedQubit !== null && typeof sim.get_expectation_z === 'function') {
-      setExpectationValue(sim.get_expectation_z(selectedQubit));
+    if (selectedQubit !== null) {
+      if (typeof sim.get_expectation_x === 'function') {
+        setExpectationValueX(sim.get_expectation_x(selectedQubit));
+      }
+      if (typeof sim.get_expectation_y === 'function') {
+        setExpectationValueY(sim.get_expectation_y(selectedQubit));
+      }
+      if (typeof sim.get_expectation_z === 'function') {
+        setExpectationValue(sim.get_expectation_z(selectedQubit));
+      }
     } else {
+      setExpectationValueX(null);
+      setExpectationValueY(null);
       setExpectationValue(null);
     }
 
@@ -1155,8 +1167,10 @@ function App() {
           ) : (
             <>
               {selectedQubit !== null && expectationValue !== null && (
-                <div className="px-4 py-3">
-                  <ExpectationValue qubitIndex={selectedQubit} value={expectationValue} measureStep={measureStep} />
+                <div className="px-4 py-3 flex flex-col">
+                  <ExpectationValue operator="Z" qubitIndex={selectedQubit} value={expectationValue} measureStep={measureStep} labels={['1', '0']} />
+                  <ExpectationValue operator="Y" qubitIndex={selectedQubit} value={expectationValueY} measureStep={measureStep} labels={['-i', '+i']} />
+                  <ExpectationValue operator="X" qubitIndex={selectedQubit} value={expectationValueX} measureStep={measureStep} labels={['-', '+']} />
                 </div>
               )}
 
