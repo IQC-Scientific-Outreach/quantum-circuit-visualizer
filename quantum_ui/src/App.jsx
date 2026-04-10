@@ -645,6 +645,12 @@ function App() {
           >
             Practice Questions →
           </Link>
+          <Link
+            to="/builder"
+            className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors mt-0.5 block"
+          >
+            Question Builder →
+          </Link>
         </div>
 
         <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">

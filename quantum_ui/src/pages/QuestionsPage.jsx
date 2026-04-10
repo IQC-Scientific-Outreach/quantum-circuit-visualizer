@@ -734,6 +734,13 @@ export default function QuestionsPage() {
           Practice Questions
         </h1>
 
+        <Link
+          to="/builder"
+          className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0"
+        >
+          Question Builder →
+        </Link>
+
         <div className="flex-1" />
 
         {/* Progress dots */}
