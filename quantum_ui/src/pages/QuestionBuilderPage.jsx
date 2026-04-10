@@ -13,33 +13,18 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import GateVisual from '../components/GateVisual';
 import { GATE_STYLES } from '../constants';
+import { applyGateDrop, TWO_WIRE, removeGateFromCircuit } from '../utils/circuitDnD';
+import DraggableCnotNode from '../components/DraggableCnotNode';
+import DraggablePlacedGate from '../components/DraggablePlacedGate';
+import DropZone from '../components/DropZone';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SINGLE_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
-const ALL_PALETTE_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE', 'CNOT', 'CZ'];
-const MULTI_QUBIT = ['CNOT', 'CZ'];
+const SINGLE_GATES   = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
+const ALL_PALETTE_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE', 'CNOT', 'CZ', 'TOFFOLI'];
 
-// Each row is h-14 (56px) + gap-2 (8px) spacing = 64px = 4rem between centers
+// Row height = h-14 (56 px) + gap-2 (8 px) = 64 px = 4 rem  (center-to-center)
 const ROW_REM = 4;
-
-const EVAL_TYPES = [
-  {
-    value: 'exact',
-    label: 'Exact Match',
-    desc: 'Student must place specific gates in specific blank slots.',
-  },
-  {
-    value: 'equivalent_state',
-    label: 'Equivalent State',
-    desc: 'Any circuit that produces the same quantum state as the answer counts.',
-  },
-  {
-    value: 'target_state',
-    label: 'Target State',
-    desc: 'Circuit must produce a specific computational-basis state with >99% probability.',
-  },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,19 +37,13 @@ function newQuestion() {
   const id = _nextId++;
   return {
     id,
-    title: '',
-    description: '',
-    points: 10,
+    title: '', description: '', points: 10,
     restrictToBlanks: true,
     allowedGates: ['H', 'X', 'Y', 'Z'],
-    evaluationType: 'exact',
-    targetState: '',
-    nQubits: 1,
-    nSteps: 3,
+    nQubits: 1, nSteps: 3,
     circuit: makeGrid(1, 3),
     exactAnswer: {},           // 'w_s' → gateName
-    answerNQubits: 1,
-    answerNSteps: 1,
+    answerNQubits: 1, answerNSteps: 1,
     answerCircuit: makeGrid(1, 1),
     hiddenBlocks: [],
   };
@@ -78,17 +57,12 @@ function download(filename, content) {
 }
 
 // ─── Serialization ────────────────────────────────────────────────────────────
+// Internal cell format mirrors the output format exactly; we just add locked:true.
 
 function serializeCell(cell) {
   if (!cell) return null;
   if (cell.blank) return { blank: true };
-  const out = { name: cell.name, locked: true };
-  if (cell.role) {
-    out.role = cell.role;
-    if (cell.role === 'control') out.targetWire = cell.linkedWire;
-    else out.controlWire = cell.linkedWire;
-  }
-  return out;
+  return { ...cell, locked: true };
 }
 
 function serializeAnswerCircuit(circuit) {
@@ -99,8 +73,14 @@ function serializeAnswerCircuit(circuit) {
       const item = { wireIndex: wi, stepIndex: si, gate: cell.name };
       if (cell.role) {
         item.role = cell.role;
-        if (cell.role === 'control') item.targetWire = cell.linkedWire;
-        else item.controlWire = cell.linkedWire;
+        if (cell.role === 'control') {
+          item.targetWire = cell.targetWire;
+          if (cell.controls) item.controls = cell.controls;
+        } else {
+          if (cell.controlWire != null) item.controlWire = cell.controlWire;
+          if (cell.controls)            item.controls     = cell.controls;
+          if (cell.targetWire != null)  item.targetWire   = cell.targetWire;
+        }
       }
       answer.push(item);
     });
@@ -111,27 +91,18 @@ function serializeAnswerCircuit(circuit) {
 function serializeQuestion(q, id) {
   const circuit = q.circuit.map(wire => wire.map(serializeCell));
   const out = {
-    id,
-    title: q.title || `Question ${id}`,
-    description: q.description,
-    points: q.points,
-    allowedGates: q.allowedGates,
-    circuit,
+    id, title: q.title || `Question ${id}`,
+    description: q.description, points: q.points,
+    allowedGates: q.allowedGates, circuit,
   };
   if (q.restrictToBlanks) out.restrictToBlanks = true;
-  if (q.evaluationType !== 'exact') out.evaluationType = q.evaluationType;
-  if (q.evaluationType === 'target_state') {
-    out.targetState = q.targetState;
-    out.answer = serializeAnswerCircuit(q.answerCircuit);
-  } else if (q.evaluationType === 'equivalent_state') {
+
+  if (!q.restrictToBlanks) {
     out.answer = serializeAnswerCircuit(q.answerCircuit);
   } else {
     out.answer = Object.entries(q.exactAnswer)
       .filter(([, gate]) => gate)
-      .map(([key, gate]) => {
-        const [w, s] = key.split('_').map(Number);
-        return { wireIndex: w, stepIndex: s, gate };
-      })
+      .map(([key, gate]) => { const [w, s] = key.split('_').map(Number); return { wireIndex: w, stepIndex: s, gate }; })
       .sort((a, b) => a.wireIndex - b.wireIndex || a.stepIndex - b.stepIndex);
   }
   if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
@@ -144,30 +115,6 @@ function generateJS(questions) {
   return `/**
  * Question definitions for the quiz system.
  * Generated by the Question Builder — edit via the builder, not by hand.
- *
- * circuit[wireIndex][stepIndex] cell types:
- *   { name, locked: true }                               – locked single-qubit gate (display only)
- *   { name, role, targetWire/controlWire, locked: true } – locked multi-qubit gate node
- *   { blank: true }                                      – empty slot the student must fill
- *   null                                                 – inactive (wire passes through silently)
- *
- * answer: [{ wireIndex, stepIndex, gate }]
- *   Specifies which blank positions must hold which gate for a correct submission.
- *
- * allowedGates: string[]
- *   Gates shown in the palette for this question.
- *
- * evaluationType: string (optional)
- *   'exact' (default): checks exact gate placement matches the 'answer' array.
- *   'target_state': checks if the simulated probability of targetState > 0.99.
- *   'equivalent_state': simulates the 'answer' circuit and checks if the student's
- *     circuit produces an identical state vector (ignoring global phase).
- *
- * restrictToBlanks: boolean (optional)
- *   If true, prevents drag-and-drop into empty grid slots.
- *
- * hiddenBlocks: [{ topWire, bottomWire, startStep, endStep }]
- *   Renders a large opaque block over parts of the circuit.
  */
 export const QUESTIONS = ${body};
 `;
@@ -178,27 +125,20 @@ export const QUESTIONS = ${body};
 function Toggle({ value, onChange, label }) {
   return (
     <label className="flex items-center gap-2.5 cursor-pointer select-none">
-      <div
-        onClick={() => onChange(!value)}
-        className="relative w-9 h-5 rounded-full transition-colors"
-        style={{ background: value ? '#3b82f6' : '#475569' }}
-      >
-        <div
-          className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
-          style={{ transform: value ? 'translateX(1.25rem)' : 'translateX(0.125rem)' }}
-        />
+      <div onClick={() => onChange(!value)} className="relative w-9 h-5 rounded-full transition-colors"
+        style={{ background: value ? '#3b82f6' : '#475569' }}>
+        <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
+          style={{ transform: value ? 'translateX(1.25rem)' : 'translateX(0.125rem)' }} />
       </div>
       <span className="text-sm text-slate-300">{label}</span>
     </label>
   );
 }
 
-// ─── Drag-and-drop circuit builder ────────────────────────────────────────────
+// ─── BuilderPaletteGate ───────────────────────────────────────────────────────
+// Draggable gate tile in the palette.  Uses type:'builder-gate' to avoid
+// conflicting with the main App's 'gate' drag type.
 
-/**
- * A small draggable gate tile for the builder palette.
- * Uses type 'builder-gate' to avoid conflicts with the main app's DnD.
- */
 function BuilderPaletteGate({ gateName }) {
   const ref = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -207,301 +147,189 @@ function BuilderPaletteGate({ gateName }) {
     if (!ref.current) return;
     return draggable({
       element: ref.current,
-      getInitialData: () => ({ type: 'builder-gate', name: gateName }),
+      getInitialData: () => ({ type: 'gate', name: gateName }),
       onDragStart: () => setIsDragging(true),
-      onDrop: () => setIsDragging(false),
+      onDrop:      () => setIsDragging(false),
     });
   }, [gateName]);
 
   if (gateName === 'BLANK') {
     return (
-      <div
-        ref={ref}
-        title="Blank slot (student fills)"
+      <div ref={ref} title="Blank slot (student fills)"
         className={`w-12 h-12 border-2 border-dashed rounded-lg cursor-grab flex flex-col items-center justify-center gap-0.5 select-none transition-opacity
-          ${isDragging ? 'opacity-40' : 'border-slate-400 hover:border-blue-400 text-slate-500 hover:text-blue-400'}`}
-      >
+          ${isDragging ? 'opacity-40' : 'border-slate-400 hover:border-blue-400 text-slate-500 hover:text-blue-400'}`}>
         <span className="text-lg font-mono leading-none">?</span>
         <span className="text-[9px] leading-none">blank</span>
       </div>
     );
   }
 
-  const isMulti = MULTI_QUBIT.includes(gateName);
+  const isMulti = TWO_WIRE.includes(gateName) || gateName === 'TOFFOLI';
   return (
-    <div
-      ref={ref}
-      title={gateName}
+    <div ref={ref} title={gateName}
       className={`border rounded-lg cursor-grab flex items-center justify-center font-bold select-none transition-opacity
         ${isMulti ? 'px-2 py-1' : 'w-12 h-12 text-sm'}
         ${GATE_STYLES[gateName] ?? 'bg-slate-600/30 border-slate-500 text-slate-300'}
-        ${isDragging ? 'opacity-40' : 'hover:brightness-125 hover:shadow-md'}`}
-    >
+        ${isDragging ? 'opacity-40' : 'hover:brightness-125 hover:shadow-md'}`}>
       <GateVisual name={gateName} />
     </div>
   );
 }
 
-/**
- * A single droppable cell in the builder grid.
- * Accepts builder-gate drops and shows current cell state visually.
- */
-function BuilderCell({ cell, wireIndex, stepIndex, gridId, onRemove }) {
+// ─── DraggableBlankSlot ───────────────────────────────────────────────────────
+function DraggableBlankSlot({ wireIndex, stepIndex, onDelete, handleRightClickDelete }) {
   const ref = useRef(null);
-  const [isOver, setIsOver] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isInsertHovered, setIsInsertHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    if (!ref.current) return;
-    return dropTargetForElements({
-      element: ref.current,
-      getData: () => ({ type: 'builder-slot', wireIndex, stepIndex, gridId }),
-      canDrop: ({ source }) => source.data.type === 'builder-gate',
-      onDragEnter: () => setIsOver(true),
-      onDragLeave: () => setIsOver(false),
-      onDrop: () => setIsOver(false),
+    const el = ref.current;
+    if (!el) return;
+    const cleanupDrag = draggable({
+      element: el,
+      getInitialData: () => ({ type: 'placed-gate', name: 'BLANK', wireIndex, stepIndex }),
+      onDragStart: () => setIsDragging(true),
+      onDrop:      () => setIsDragging(false),
     });
-  }, [wireIndex, stepIndex, gridId]);
+    const cleanupDrop = dropTargetForElements({
+      element: el,
+      getData: () => ({ type: 'gate-insert', wireIndex, stepIndex }),
+      onDragEnter: () => setIsInsertHovered(true),
+      onDragLeave: () => setIsInsertHovered(false),
+      onDrop:      () => setIsInsertHovered(false),
+    });
+    return () => { cleanupDrag(); cleanupDrop(); };
+  }, [wireIndex, stepIndex]);
 
-  const overRing = isOver ? 'ring-2 ring-blue-400' : '';
+  const gateClasses = `w-full h-full border-2 border-dashed rounded flex flex-col items-center justify-center gap-0.5 select-none cursor-grab transition-all z-20
+    ${isDragging ? 'opacity-50' : 'border-slate-500 bg-slate-800/30 hover:border-slate-400'}
+    ${isInsertHovered ? 'border-l-4 border-l-blue-400 scale-105 shadow-blue-500/50' : ''}`;
 
-  // ── Empty cell ────────────────────────────────────────────────────────────
+  return (
+    <div className="relative w-full h-full" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+      <div ref={ref} className={gateClasses} onContextMenu={(e) => handleRightClickDelete(e, wireIndex, stepIndex)} title="Drag to move">
+        <span className="text-xl font-mono text-slate-600 select-none">?</span>
+      </div>
+      {isHovered && !isDragging && (
+        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-600 text-slate-200 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-30 leading-none transition-colors" title="Delete blank">×</button>
+      )}
+    </div>
+  );
+}
+
+// ─── BuilderCellContent ───────────────────────────────────────────────────────
+function BuilderCellContent({ cell, wireIndex, stepIndex, onDelete }) {
   if (!cell) {
+    return <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />;
+  }
+
+  if (cell.blank) {
     return (
-      <div
-        ref={ref}
-        className={`w-14 h-14 border-2 border-dashed rounded-lg transition-colors
-          ${isOver ? 'border-blue-400 bg-blue-500/15' : 'border-slate-700 hover:border-slate-500'}`}
+      <DraggableBlankSlot
+        wireIndex={wireIndex} stepIndex={stepIndex}
+        handleRightClickDelete={(e, w, s) => { e.preventDefault(); onDelete(w, s); }}
+        onDelete={() => onDelete(wireIndex, stepIndex)}
       />
     );
   }
 
-  // ── Blank slot ────────────────────────────────────────────────────────────
-  if (cell.blank) {
+  if (TWO_WIRE.includes(cell.name) || cell.name === 'TOFFOLI') {
     return (
-      <div
-        ref={ref}
-        className={`group relative w-14 h-14 border-2 border-dashed rounded-lg transition-colors flex items-center justify-center
-          ${isOver ? 'border-blue-400 bg-blue-500/15' : 'border-slate-500 bg-slate-800/30 hover:border-slate-400'}`}
-        title="Blank slot — student must fill this"
-      >
-        <span className="text-xl font-mono text-slate-600 select-none">?</span>
-        <button
-          onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-600 text-slate-200 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-20 leading-none opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Remove"
-        >×</button>
+      <div className="w-full h-full relative flex items-center justify-center z-20 group/cnot" onContextMenu={(e) => { e.preventDefault(); onDelete(wireIndex, stepIndex); }}>
+        <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
+        {cell.name === 'TOFFOLI' ? (
+          wireIndex === Math.min(...cell.controls, cell.targetWire) && (
+            <>
+              <div className="absolute w-px bg-slate-400 z-0 pointer-events-none" style={{ left: 'calc(50% - 1px)', top: '50%', height: `${(Math.max(...cell.controls, cell.targetWire) - wireIndex) * 5}rem` }} />
+              <button onClick={(e) => { e.stopPropagation(); onDelete(wireIndex, stepIndex); }} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none">×</button>
+            </>
+          )
+        ) : (
+          cell.role === 'control' && (
+            <>
+              <div className="absolute w-px bg-slate-400 z-0 pointer-events-none" style={{ left: 'calc(50% - 1px)', top: cell.targetWire > wireIndex ? '50%' : 'auto', bottom: cell.targetWire < wireIndex ? '50%' : 'auto', height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem` }} />
+              <button onClick={(e) => { e.stopPropagation(); onDelete(wireIndex, stepIndex); }} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none">×</button>
+            </>
+          )
+        )}
       </div>
     );
   }
 
-  // ── CNOT/CZ control node ──────────────────────────────────────────────────
-  if (cell.role === 'control') {
-    const diff = cell.linkedWire - wireIndex;
-    return (
-      <div
-        ref={ref}
-        className={`group relative w-14 h-14 flex items-center justify-center rounded-lg ${overRing}`}
-      >
-        {/* Vertical connecting line to target wire */}
-        <div
-          className="absolute w-px bg-slate-400 pointer-events-none z-0"
-          style={{
-            left: 'calc(50% - 0.5px)',
-            top: diff > 0 ? '50%' : 'auto',
-            bottom: diff < 0 ? '50%' : 'auto',
-            height: `${Math.abs(diff) * ROW_REM}rem`,
-          }}
-        />
-        {/* Control dot */}
-        <div className="w-3.5 h-3.5 rounded-full bg-slate-300 z-10" />
-        <button
-          onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-600 text-slate-200 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-20 leading-none opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Remove gate"
-        >×</button>
-      </div>
-    );
-  }
-
-  // ── CNOT target ───────────────────────────────────────────────────────────
-  if (cell.role === 'target' && cell.name === 'CNOT') {
-    return (
-      <div ref={ref} className={`group relative w-14 h-14 flex items-center justify-center rounded-lg ${overRing}`}>
-        <div className="w-9 h-9 border-2 border-slate-400/80 bg-slate-800/60 rounded flex items-center justify-center select-none">
-          <span className="text-slate-200 text-base font-bold leading-none">X</span>
-        </div>
-        <button
-          onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-600 text-slate-200 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-20 leading-none opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Remove gate"
-        >×</button>
-      </div>
-    );
-  }
-
-  // ── CZ target ─────────────────────────────────────────────────────────────
-  if (cell.role === 'target' && cell.name === 'CZ') {
-    return (
-      <div ref={ref} className={`group relative w-14 h-14 flex items-center justify-center rounded-lg ${overRing}`}>
-        <div className="w-9 h-9 border border-slate-400/70 bg-slate-500/10 rounded flex items-center justify-center select-none">
-          <span className="text-slate-300 text-base font-bold leading-none">Z</span>
-        </div>
-        <button
-          onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-600 text-slate-200 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-20 leading-none opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Remove gate"
-        >×</button>
-      </div>
-    );
-  }
-
-  // ── Single-qubit locked gate ───────────────────────────────────────────────
   return (
-    <div
-      ref={ref}
-      className={`group relative w-14 h-14 border rounded-lg flex items-center justify-center font-bold text-lg transition-all
-        ${GATE_STYLES[cell.name] ?? 'bg-slate-600/30 border-slate-500 text-slate-200'}
-        ${isOver ? 'brightness-125 shadow-md' : 'hover:brightness-110'}`}
-      title={cell.name}
-    >
-      <GateVisual name={cell.name} />
-      <button
-        onClick={onRemove}
-        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-600 text-slate-200 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-20 leading-none opacity-0 group-hover:opacity-100 transition-opacity"
-        title="Remove gate"
-      >×</button>
-    </div>
+    <DraggablePlacedGate
+      cell={cell} wireIndex={wireIndex} stepIndex={stepIndex}
+      handleRightClickDelete={(e, w, s) => { e.preventDefault(); onDelete(w, s); }}
+      onDelete={() => onDelete(wireIndex, stepIndex)}
+    />
   );
 }
 
-/**
- * Popover that appears on a CNOT/CZ control cell when the teacher just dropped
- * a multi-qubit gate and needs to pick the target wire.
- */
-function CnotTargetPicker({ gateName, controlWire, nQubits, onConfirm, onCancel }) {
-  return (
-    <div className="absolute z-30 top-1 left-16 bg-slate-800 border border-blue-500/60 rounded-lg p-3 shadow-xl min-w-35">
-      <p className="text-[10px] text-blue-300 font-medium mb-2">{gateName}: pick target wire</p>
-      <div className="flex flex-col gap-1">
-        {Array.from({ length: nQubits }, (_, i) => i)
-          .filter(i => i !== controlWire)
-          .map(i => (
-            <button
-              key={i}
-              onClick={() => onConfirm(i)}
-              className="text-xs text-left px-2 py-1 rounded hover:bg-blue-600/30 text-slate-200 hover:text-white transition-colors"
-            >
-              q[{i}]
-            </button>
-          ))}
-      </div>
-      <button onClick={onCancel} className="mt-2 text-[10px] text-slate-500 hover:text-slate-300 transition-colors">Cancel</button>
-    </div>
-  );
-}
+// ─── BuilderCircuitGrid ───────────────────────────────────────────────────────
+// Full drag-and-drop circuit grid: palette + wires + drop cells.
+//
+// DnD types used (namespaced with 'builder-' to avoid conflicts with App.jsx):
+//   source  builder-gate      → palette gate dragged onto a cell
+//   source  builder-cnot-node → placed multi-qubit node dragged to new wire
+//   target  builder-slot      → any empty or occupied cell
+//
+// Gate placement mirrors App.jsx:
+//   CNOT/CZ   → control at dropped wire, target at wire±1
+//   TOFFOLI   → controls at w, w+1 (or w-1), target at w+2 (or first free)
+//   single    → placed directly
+//   BLANK     → blank slot (shown only when showBlanks=true)
 
-/**
- * The full visual circuit builder — gate palette + droppable wire grid.
- *
- * onCellsChange(updates) — called with an array of { wireIndex, stepIndex, cell }
- * so that multi-qubit gates can update two cells atomically.
- */
 function BuilderCircuitGrid({
-  gridId,
-  nQubits, nSteps, circuit,
+  gridId, nQubits, nSteps, circuit,
   onCellsChange,
-  onAddWire, onRemoveWire,
-  onAddStep, onRemoveStep,
-  showBlanks,
+  onAddWire, onRemoveWire, onAddStep, onRemoveStep,
+  showBlanks, paletteGates,
 }) {
-  // After dropping a multi-qubit gate we need a second click to choose the target wire
-  const [pendingMulti, setPendingMulti] = useState(null); // { wireIndex, stepIndex, name }
+  function removeCell(w, s) {
+    onCellsChange(prev => removeGateFromCircuit(prev, w, s));
+  }
 
-  // Cancel pending if Escape pressed
-  useEffect(() => {
-    if (!pendingMulti) return;
-    const handler = (e) => { if (e.key === 'Escape') setPendingMulti(null); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [pendingMulti]);
-
-  // Monitor for gate drops onto this grid's cells
   useEffect(() => {
     return monitorForElements({
       onDrop({ source, location }) {
         const [dest] = location.current.dropTargets;
         if (!dest) return;
-        if (dest.data.gridId !== gridId) return;
-        if (source.data.type !== 'builder-gate') return;
 
-        const { wireIndex, stepIndex } = dest.data;
-        const { name } = source.data;
+        const destGrid = dest.element.closest('[data-grid-id]');
+        if (destGrid?.getAttribute('data-grid-id') !== gridId) return;
 
-        if (name === 'BLANK') {
-          onCellsChange([{ wireIndex, stepIndex, cell: { blank: true } }]);
-        } else if (MULTI_QUBIT.includes(name)) {
-          if (nQubits < 2) return; // can't place multi-qubit on 1-qubit circuit
-          // Place a "pending control" node and show picker
-          onCellsChange([{ wireIndex, stepIndex, cell: { name, role: 'control', linkedWire: -1 } }]);
-          setPendingMulti({ wireIndex, stepIndex, name });
-        } else {
-          onCellsChange([{ wireIndex, stepIndex, cell: { name } }]);
-        }
+        const srcGrid = source.element.closest('[data-grid-id]');
+        if (srcGrid && srcGrid?.getAttribute('data-grid-id') !== gridId) return;
+
+        onCellsChange(prevCircuit => {
+          return applyGateDrop(prevCircuit, source.data, dest.data);
+        });
       },
     });
   }, [gridId, nQubits, onCellsChange]);
 
-  function confirmMultiTarget(targetWire) {
-    if (!pendingMulti) return;
-    const { wireIndex, stepIndex, name } = pendingMulti;
-    onCellsChange([
-      { wireIndex, stepIndex, cell: { name, role: 'control', linkedWire: targetWire } },
-      { wireIndex: targetWire, stepIndex, cell: { name, role: 'target', linkedWire: wireIndex } },
-    ]);
-    setPendingMulti(null);
-  }
-
-  function removeCell(w, s) {
-    const cell = circuit[w]?.[s];
-    if (!cell) return;
-    if (cell.role) {
-      // Remove both halves of multi-qubit gate
-      onCellsChange([
-        { wireIndex: w, stepIndex: s, cell: null },
-        { wireIndex: cell.linkedWire, stepIndex: s, cell: null },
-      ]);
-    } else {
-      onCellsChange([{ wireIndex: w, stepIndex: s, cell: null }]);
-    }
-    // Also cancel pending if it was this cell
-    if (pendingMulti?.wireIndex === w && pendingMulti?.stepIndex === s) {
-      setPendingMulti(null);
-    }
-  }
-
   const btnCls = 'w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 flex items-center justify-center text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 
   return (
-    <div>
+    <div data-grid-id={gridId}>
       {/* ── Gate palette ─────────────────────────────────────────────────── */}
       <div className="flex gap-2 flex-wrap items-end mb-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/40">
         <span className="text-[10px] text-slate-500 uppercase tracking-widest self-center mr-1">Palette</span>
         {showBlanks && <BuilderPaletteGate gateName="BLANK" />}
-        {ALL_PALETTE_GATES.map(g => (
-          <BuilderPaletteGate key={g} gateName={g} />
-        ))}
+        {paletteGates.map(g => <BuilderPaletteGate key={g} gateName={g} />)}
       </div>
 
-      {/* ── Grid controls ────────────────────────────────────────────────── */}
+      {/* ── Grid controls ─────────────────────────────────────────────────── */}
       <div className="flex gap-3 mb-4 items-center flex-wrap text-xs text-slate-400">
         <span>Qubits:</span>
-        <button onClick={onRemoveWire} disabled={nQubits <= 1} className={btnCls}>−</button>
+        {onRemoveWire && <button onClick={onRemoveWire} disabled={nQubits <= 1}  className={btnCls}>−</button>}
         <span className="text-slate-200 w-4 text-center font-medium">{nQubits}</span>
-        <button onClick={onAddWire} disabled={nQubits >= 10} className={btnCls}>+</button>
-        <span className="ml-4">Steps:</span>
-        <button onClick={onRemoveStep} disabled={nSteps <= 1} className={btnCls}>−</button>
+        {onAddWire && <button onClick={onAddWire}    disabled={nQubits >= 10} className={btnCls}>+</button>}
+        <span className={onAddWire ? "ml-4" : "ml-2"}>Steps:</span>
+        {onRemoveStep && <button onClick={onRemoveStep} disabled={nSteps <= 1}   className={btnCls}>−</button>}
         <span className="text-slate-200 w-4 text-center font-medium">{nSteps}</span>
-        <button onClick={onAddStep} disabled={nSteps >= 20} className={btnCls}>+</button>
+        {onAddStep && <button onClick={onAddStep}    disabled={nSteps >= 20}  className={btnCls}>+</button>}
       </div>
 
       {/* ── Circuit grid ─────────────────────────────────────────────────── */}
@@ -509,52 +337,28 @@ function BuilderCircuitGrid({
         {/* Step labels */}
         <div className="flex mb-1 ml-14">
           {Array.from({ length: nSteps }, (_, s) => (
-            <div key={s} className="w-14 text-center text-[10px] text-slate-600 mr-2">
-              Step {s}
-            </div>
+            <div key={s} className="w-14 text-center text-[10px] text-slate-600 mr-2">Step {s}</div>
           ))}
         </div>
 
         {/* Wire rows */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 mt-2">
           {Array.from({ length: nQubits }, (_, w) => (
             <div key={w} className="flex items-center">
-              {/* Qubit label */}
-              <div className="w-12 shrink-0 text-xs text-slate-500 text-right pr-2">
-                q[{w}]
-              </div>
+              <div className="w-12 shrink-0 text-xs text-slate-500 text-right pr-2 font-mono">q[{w}]</div>
 
-              {/* Horizontal wire + cells */}
-              <div className="relative flex items-center gap-2">
-                {/* Wire line */}
-                <div className="absolute inset-y-0 left-0 right-0 flex items-center pointer-events-none">
-                  <div className="w-full h-px bg-slate-600" />
-                </div>
+              <div className="relative flex items-center py-2 px-1">
+                {/* Horizontal wire line */}
+                <div className="absolute left-0 right-0 h-px bg-slate-600 z-0" />
 
                 {/* Cells */}
                 {Array.from({ length: nSteps }, (_, s) => (
-                  <div key={s} className="relative z-10">
-                    <BuilderCell
+                  <div key={s} className="w-14 h-14 relative flex items-center justify-center mx-1 z-10">
+                    <BuilderCellContent
                       cell={circuit[w]?.[s] ?? null}
-                      wireIndex={w}
-                      stepIndex={s}
-                      gridId={gridId}
+                      wireIndex={w} stepIndex={s}
                       onRemove={() => removeCell(w, s)}
                     />
-                    {/* Target picker popover */}
-                    {pendingMulti?.wireIndex === w && pendingMulti?.stepIndex === s && (
-                      <CnotTargetPicker
-                        gateName={pendingMulti.name}
-                        controlWire={w}
-                        nQubits={nQubits}
-                        onConfirm={confirmMultiTarget}
-                        onCancel={() => {
-                          // Remove the half-placed control
-                          onCellsChange([{ wireIndex: w, stepIndex: s, cell: null }]);
-                          setPendingMulti(null);
-                        }}
-                      />
-                    )}
                   </div>
                 ))}
               </div>
@@ -571,100 +375,86 @@ function BuilderCircuitGrid({
 function QuestionEditor({ question: q, onChange }) {
   function update(patch) { onChange({ ...q, ...patch }); }
 
-  // ── Circuit change handlers (batch updates to avoid stale reads) ──────────
-
-  function applyCircuitUpdates(grid, updates) {
-    const newGrid = grid.map(wire => [...wire]);
-    updates.forEach(({ wireIndex: w, stepIndex: s, cell }) => {
-      if (newGrid[w]) newGrid[w][s] = cell;
-    });
-    return newGrid;
-  }
-
-  function handleCircuitChange(updates) {
-    const newCircuit = applyCircuitUpdates(q.circuit, updates);
-    // If a cell was cleared or changed away from blank, remove from exactAnswer
+  function handleCircuitChange(updater) {
+    const prevGrid = q.circuit;
+    const newCircuit = typeof updater === 'function' ? updater(prevGrid) : updater;
+    if (newCircuit === prevGrid) return;
+    const newSteps = newCircuit[0].length;
     const newExact = { ...q.exactAnswer };
-    updates.forEach(({ wireIndex: w, stepIndex: s, cell }) => {
-      if (!cell?.blank) delete newExact[`${w}_${s}`];
+    newCircuit.forEach((wire, w) => {
+      wire.forEach((cell, s) => {
+        if (!cell?.blank) delete newExact[`${w}_${s}`];
+      });
     });
-    update({ circuit: newCircuit, exactAnswer: newExact });
+    update({ circuit: newCircuit, nSteps: newSteps, exactAnswer: newExact });
   }
 
-  function handleAnswerChange(updates) {
-    const newGrid = applyCircuitUpdates(q.answerCircuit, updates);
-    update({ answerCircuit: newGrid });
+  function handleAnswerChange(updater) {
+    const prevGrid = q.answerCircuit;
+    const newCircuit = typeof updater === 'function' ? updater(prevGrid) : updater;
+    if (newCircuit === prevGrid) return;
+    const newSteps = newCircuit[0].length;
+    update({ answerCircuit: newCircuit, answerNSteps: newSteps });
   }
 
-  // ── Wire / step resize helpers ────────────────────────────────────────────
+  // ── Wire / step resize ────────────────────────────────────────────────────
 
   function addWire() {
+    const nextNQubits = q.nQubits + 1;
+    const nextAnswerCircuit = [...q.answerCircuit];
+    while (nextAnswerCircuit.length < nextNQubits) {
+      nextAnswerCircuit.push(Array(q.answerNSteps).fill(null));
+    }
     update({
-      nQubits: q.nQubits + 1,
+      nQubits: nextNQubits,
       circuit: [...q.circuit, Array(q.nSteps).fill(null)],
-      answerNQubits: q.answerNQubits + 1,
-      answerCircuit: [...q.answerCircuit, Array(q.answerNSteps).fill(null)],
+      answerNQubits: nextNQubits,
+      answerCircuit: nextAnswerCircuit,
     });
   }
-
   function removeWire() {
     if (q.nQubits <= 1) return;
-    const dropped = q.nQubits - 1;
+    const d = q.nQubits - 1;
     const newExact = Object.fromEntries(
-      Object.entries(q.exactAnswer).filter(([k]) => Number(k.split('_')[0]) < dropped)
+      Object.entries(q.exactAnswer).filter(([k]) => Number(k.split('_')[0]) < d)
     );
     update({
-      nQubits: dropped,
-      circuit: q.circuit.slice(0, dropped),
-      exactAnswer: newExact,
-      answerNQubits: Math.max(1, q.answerNQubits - 1),
-      answerCircuit: q.answerCircuit.slice(0, Math.max(1, q.answerNQubits - 1)),
+      nQubits: d, circuit: q.circuit.slice(0, d), exactAnswer: newExact,
+      answerNQubits: d,
+      answerCircuit: q.answerCircuit.slice(0, d),
     });
   }
-
-  function addStep() {
-    update({ nSteps: q.nSteps + 1, circuit: q.circuit.map(w => [...w, null]) });
-  }
-
+  function addStep()    { update({ nSteps: q.nSteps + 1, circuit: q.circuit.map(w => [...w, null]) }); }
   function removeStep() {
     if (q.nSteps <= 1) return;
     const last = q.nSteps - 1;
     const newExact = Object.fromEntries(
       Object.entries(q.exactAnswer).filter(([k]) => Number(k.split('_')[1]) < last)
     );
-    update({
-      nSteps: last,
-      circuit: q.circuit.map(w => w.slice(0, last)),
-      exactAnswer: newExact,
-    });
+    update({ nSteps: last, circuit: q.circuit.map(w => w.slice(0, last)), exactAnswer: newExact });
   }
-
-  function addAnswerStep() {
-    update({ answerNSteps: q.answerNSteps + 1, answerCircuit: q.answerCircuit.map(w => [...w, null]) });
-  }
-
+  function addAnswerStep()    { update({ answerNSteps: q.answerNSteps + 1, answerCircuit: q.answerCircuit.map(w => [...w, null]) }); }
   function removeAnswerStep() {
     if (q.answerNSteps <= 1) return;
     update({ answerNSteps: q.answerNSteps - 1, answerCircuit: q.answerCircuit.map(w => w.slice(0, -1)) });
   }
 
-  // ── Blank positions (for exact answer section) ────────────────────────────
+  // ── Blank positions (exact answer section) ────────────────────────────────
   const blanks = [];
   q.circuit.forEach((wire, wi) =>
     wire.forEach((cell, si) => { if (cell?.blank) blanks.push({ wi, si }); })
   );
 
   function toggleGate(gate) {
-    update({
-      allowedGates: q.allowedGates.includes(gate)
-        ? q.allowedGates.filter(g => g !== gate)
-        : [...q.allowedGates, gate],
-    });
+    update({ allowedGates: q.allowedGates.includes(gate) ? q.allowedGates.filter(g => g !== gate) : [...q.allowedGates, gate] });
   }
 
   const sectionCls = 'bg-slate-800 rounded-xl p-5 space-y-4 border border-slate-700/50';
-  const labelCls = 'block text-xs font-medium text-slate-400 mb-1';
-  const inputCls = 'w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
+  const labelCls   = 'block text-xs font-medium text-slate-400 mb-1';
+  const inputCls   = 'w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
+
+  // Answer palette = only the gates the student is allowed to use
+  const answerPalette = ALL_PALETTE_GATES.filter(g => q.allowedGates.includes(g));
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -689,49 +479,20 @@ function QuestionEditor({ question: q, onChange }) {
             <input type="number" min={1} value={q.points} onChange={e => update({ points: Number(e.target.value) })}
               className="w-24 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
           </div>
-          <div className="pb-0.5">
+          <div className="pb-0.5 flex flex-col gap-1">
             <Toggle value={q.restrictToBlanks} onChange={v => update({ restrictToBlanks: v })}
               label="Restrict student to blank slots only" />
+            <span className="text-[10px] text-slate-500 pl-11">
+              {q.restrictToBlanks ? 'Exact match evaluation mode' : 'Equivalent state evaluation mode'}
+            </span>
           </div>
         </div>
-      </section>
-
-      {/* ── Evaluation Type ────────────────────────────────────────────────── */}
-      <section className={sectionCls}>
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Evaluation Type</h3>
-        <div className="space-y-2">
-          {EVAL_TYPES.map(et => (
-            <label key={et.value}
-              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors
-                ${q.evaluationType === et.value ? 'border-blue-500/60 bg-blue-500/10' : 'border-slate-700 hover:border-slate-500'}`}>
-              <input type="radio" name={`evalType_${q.id}`} value={et.value}
-                checked={q.evaluationType === et.value} onChange={() => update({ evaluationType: et.value })}
-                className="mt-0.5 accent-blue-500" />
-              <div>
-                <div className="text-sm font-medium text-slate-200">{et.label}</div>
-                <div className="text-xs text-slate-400 mt-0.5">{et.desc}</div>
-              </div>
-            </label>
-          ))}
-        </div>
-        {q.evaluationType === 'target_state' && (
-          <div>
-            <label className={labelCls}>
-              Target State&ensp;
-              <span className="text-slate-500 font-normal">(e.g. "00" for |00⟩, "10" for |10⟩)</span>
-            </label>
-            <input type="text" value={q.targetState} onChange={e => update({ targetState: e.target.value })}
-              placeholder="00"
-              className="w-32 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-500" />
-          </div>
-        )}
       </section>
 
       {/* ── Allowed Gates ──────────────────────────────────────────────────── */}
       <section className={sectionCls}>
         <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-          Allowed Gates&ensp;
-          <span className="text-slate-500 normal-case font-normal">(shown in the student palette)</span>
+          Allowed Gates&ensp;<span className="text-slate-500 normal-case font-normal">(shown in the student palette)</span>
         </h3>
         <div className="flex flex-wrap gap-2">
           {ALL_PALETTE_GATES.map(gate => (
@@ -753,21 +514,16 @@ function QuestionEditor({ question: q, onChange }) {
       <section className={sectionCls}>
         <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Given Circuit</h3>
         <p className="text-xs text-slate-400">
-          Drag gates from the palette onto the grid.
+          Drag gates onto the grid. Multi-qubit gates auto-place on adjacent wires — drag the nodes to reposition.
           Use <span className="font-medium text-slate-300">Blank</span> for slots the student must fill.
-          Hover a placed gate and click <span className="font-medium text-slate-300">×</span> to remove it.
         </p>
         <BuilderCircuitGrid
           gridId={`given_${q.id}`}
-          nQubits={q.nQubits}
-          nSteps={q.nSteps}
-          circuit={q.circuit}
+          nQubits={q.nQubits} nSteps={q.nSteps} circuit={q.circuit}
           onCellsChange={handleCircuitChange}
-          onAddWire={addWire}
-          onRemoveWire={removeWire}
-          onAddStep={addStep}
-          onRemoveStep={removeStep}
-          showBlanks
+          onAddWire={addWire} onRemoveWire={removeWire}
+          onAddStep={addStep} onRemoveStep={removeStep}
+          showBlanks paletteGates={ALL_PALETTE_GATES}
         />
       </section>
 
@@ -775,15 +531,13 @@ function QuestionEditor({ question: q, onChange }) {
       <section className={sectionCls}>
         <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Answer / Solution</h3>
 
-        {q.evaluationType === 'exact' && (
+        {q.restrictToBlanks && (
           <>
             <p className="text-xs text-slate-400">
-              For each blank slot in the circuit above, pick the correct gate.
+              For each blank slot in the given circuit, pick the correct gate.
             </p>
             {blanks.length === 0 ? (
-              <p className="text-xs text-slate-500 italic">
-                No blanks yet — add "Blank" tiles to the given circuit above.
-              </p>
+              <p className="text-xs text-slate-500 italic">No blanks yet — add Blank tiles to the given circuit above.</p>
             ) : (
               <div className="space-y-2">
                 {blanks.map(({ wi, si }) => (
@@ -793,10 +547,9 @@ function QuestionEditor({ question: q, onChange }) {
                     <select
                       value={q.exactAnswer[`${wi}_${si}`] || ''}
                       onChange={e => update({ exactAnswer: { ...q.exactAnswer, [`${wi}_${si}`]: e.target.value } })}
-                      className="text-xs bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-slate-200"
-                    >
+                      className="text-xs bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-slate-200">
                       <option value="">— select —</option>
-                      {SINGLE_GATES.map(g => <option key={g} value={g}>{g}</option>)}
+                      {q.allowedGates.filter(g => SINGLE_GATES.includes(g)).map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </div>
                 ))}
@@ -805,30 +558,20 @@ function QuestionEditor({ question: q, onChange }) {
           </>
         )}
 
-        {(q.evaluationType === 'equivalent_state' || q.evaluationType === 'target_state') && (
+        {!q.restrictToBlanks && (
           <>
             <p className="text-xs text-slate-400">
-              {q.evaluationType === 'equivalent_state'
-                ? 'Build the reference answer circuit. Any student circuit producing the identical quantum state will be accepted.'
-                : 'Build a sample answer circuit (used as the reference / model answer).'}
+              Build the reference answer circuit using only the gates students are allowed. Any circuit producing the same state is accepted.
             </p>
+            {answerPalette.length === 0 && (
+              <p className="text-xs text-amber-400">No allowed gates selected above — enable some gates first.</p>
+            )}
             <BuilderCircuitGrid
               gridId={`answer_${q.id}`}
-              nQubits={q.answerNQubits}
-              nSteps={q.answerNSteps}
-              circuit={q.answerCircuit}
+              nQubits={q.answerNQubits} nSteps={q.answerNSteps} circuit={q.answerCircuit}
               onCellsChange={handleAnswerChange}
-              onAddWire={() => update({
-                answerNQubits: q.answerNQubits + 1,
-                answerCircuit: [...q.answerCircuit, Array(q.answerNSteps).fill(null)],
-              })}
-              onRemoveWire={() => {
-                if (q.answerNQubits <= 1) return;
-                update({ answerNQubits: q.answerNQubits - 1, answerCircuit: q.answerCircuit.slice(0, -1) });
-              }}
-              onAddStep={addAnswerStep}
-              onRemoveStep={removeAnswerStep}
-              showBlanks={false}
+              onAddStep={addAnswerStep} onRemoveStep={removeAnswerStep}
+              showBlanks={false} paletteGates={answerPalette}
             />
           </>
         )}
@@ -838,15 +581,11 @@ function QuestionEditor({ question: q, onChange }) {
       <section className={sectionCls}>
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-            Hidden Blocks&ensp;
-            <span className="text-slate-500 normal-case font-normal">(advanced)</span>
+            Hidden Blocks&ensp;<span className="text-slate-500 normal-case font-normal">(advanced)</span>
           </h3>
           <button
-            onClick={() => update({
-              hiddenBlocks: [...q.hiddenBlocks, { topWire: 0, bottomWire: Math.max(0, q.nQubits - 1), startStep: 0, endStep: 0 }],
-            })}
-            className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 border border-slate-600 transition-colors"
-          >
+            onClick={() => update({ hiddenBlocks: [...q.hiddenBlocks, { topWire: 0, bottomWire: Math.max(0, q.nQubits - 1), startStep: 0, endStep: 0 }] })}
+            className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 border border-slate-600 transition-colors">
             + Add Hidden Block
           </button>
         </div>
@@ -856,9 +595,7 @@ function QuestionEditor({ question: q, onChange }) {
           </p>
         )}
         {q.hiddenBlocks.map((block, i) => {
-          function updateBlock(patch) {
-            const nb = [...q.hiddenBlocks]; nb[i] = { ...block, ...patch }; update({ hiddenBlocks: nb });
-          }
+          function updateBlock(patch) { const nb = [...q.hiddenBlocks]; nb[i] = { ...block, ...patch }; update({ hiddenBlocks: nb }); }
           const ni = 'w-14 text-xs bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-slate-200';
           return (
             <div key={i} className="flex gap-3 items-center p-3 bg-slate-700/60 rounded-lg border border-slate-600/50 flex-wrap">
@@ -866,8 +603,7 @@ function QuestionEditor({ question: q, onChange }) {
                 <div key={key} className="flex items-center gap-1.5">
                   <span className="text-xs text-slate-400">{label}</span>
                   <input type="number" min={0} max={key.includes('Wire') ? q.nQubits - 1 : q.nSteps - 1}
-                    value={block[key]} onChange={e => updateBlock({ [key]: Number(e.target.value) })}
-                    className={ni} />
+                    value={block[key]} onChange={e => updateBlock({ [key]: Number(e.target.value) })} className={ni} />
                 </div>
               ))}
               <button onClick={() => update({ hiddenBlocks: q.hiddenBlocks.filter((_, j) => j !== i) })}
@@ -891,98 +627,78 @@ export default function QuestionBuilderPage() {
   });
 
   function setQuestions(updater) {
-    _setState(s => ({
-      ...s,
-      questions: typeof updater === 'function' ? updater(s.questions) : updater,
-    }));
+    _setState(s => ({ ...s, questions: typeof updater === 'function' ? updater(s.questions) : updater }));
   }
   function setSelectedId(id) { _setState(s => ({ ...s, selectedId: id })); }
 
   const importRef = useRef(null);
   const selectedQ = questions.find(q => q.id === selectedId);
 
-  function updateQuestion(updated) {
-    setQuestions(qs => qs.map(q => q.id === updated.id ? updated : q));
-  }
-
-  function addQuestion() {
-    const q = newQuestion();
-    setQuestions(qs => [...qs, q]);
-    setSelectedId(q.id);
-  }
-
-  function deleteQuestion(id) {
+  function updateQuestion(updated) { setQuestions(qs => qs.map(q => q.id === updated.id ? updated : q)); }
+  function addQuestion()           { const q = newQuestion(); setQuestions(qs => [...qs, q]); setSelectedId(q.id); }
+  function deleteQuestion(id)      {
     setQuestions(qs => {
       const remaining = qs.filter(q => q.id !== id);
       if (selectedId === id && remaining.length > 0) setSelectedId(remaining[0].id);
       return remaining;
     });
   }
-
   function moveQuestion(id, dir) {
     setQuestions(qs => {
       const idx = qs.findIndex(q => q.id === id);
-      const newIdx = idx + dir;
-      if (newIdx < 0 || newIdx >= qs.length) return qs;
+      const ni = idx + dir;
+      if (ni < 0 || ni >= qs.length) return qs;
       const newQs = [...qs];
-      [newQs[idx], newQs[newIdx]] = [newQs[newIdx], newQs[idx]];
+      [newQs[idx], newQs[ni]] = [newQs[ni], newQs[idx]];
       return newQs;
     });
   }
 
   function handleImport(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
       try {
         const data = JSON.parse(ev.target.result);
         if (Array.isArray(data) && data.length > 0) {
-          setQuestions(data);
-          setSelectedId(data[0].id);
+          const syncedData = data.map(q => {
+            let ac = q.answerCircuit || [[null]];
+            while (ac.length < (q.nQubits || 1)) ac.push(Array(q.answerNSteps || 1).fill(null));
+            return { ...q, answerNQubits: q.nQubits || 1, answerCircuit: ac.slice(0, q.nQubits || 1) };
+          });
+          setQuestions(syncedData); setSelectedId(syncedData[0].id);
           _nextId = Math.max(...data.map(q => q.id ?? 0)) + 1;
-        } else {
-          alert('File does not contain a valid question list.');
-        }
-      } catch {
-        alert('Could not parse the file — make sure it is a valid JSON backup.');
-      }
+        } else { alert('File does not contain a valid question list.'); }
+      } catch { alert('Could not parse the file — make sure it is a valid JSON backup.'); }
     };
-    reader.readAsText(file);
-    e.target.value = '';
+    reader.readAsText(file); e.target.value = '';
   }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
-
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="bg-slate-800 border-b border-slate-700/60 px-5 py-3 flex items-center gap-4 shrink-0">
-        <Link to="/questions" className="text-slate-500 hover:text-slate-300 text-xs transition-colors">
-          ← Questions
-        </Link>
+        <Link to="/questions" className="text-slate-500 hover:text-slate-300 text-xs transition-colors">← Questions</Link>
         <span className="text-slate-700 select-none">|</span>
         <h1 className="text-sm font-semibold text-white tracking-tight">Question Builder</h1>
         <div className="flex-1" />
         <div className="flex gap-2 items-center">
           <input ref={importRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
           <button onClick={() => importRef.current?.click()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 text-slate-300 transition-colors">
+            className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 text-slate-300 transition-colors">
             ↑ Load JSON backup
           </button>
           <button onClick={() => download('questions_backup.json', JSON.stringify(questions, null, 2))}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 text-slate-300 transition-colors">
+            className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 text-slate-300 transition-colors">
             ↓ Save JSON backup
           </button>
           <button onClick={() => download('questionData.js', generateJS(questions))}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500 text-white font-semibold transition-colors">
+            className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500 text-white font-semibold transition-colors">
             ↓ Export questionData.js
           </button>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-
-        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
         <aside className="w-52 shrink-0 border-r border-slate-700/60 bg-slate-800/60 flex flex-col">
           <div className="p-3 border-b border-slate-700/50">
             <button onClick={addQuestion}
@@ -994,13 +710,9 @@ export default function QuestionBuilderPage() {
             {questions.map((q, idx) => (
               <div key={q.id} onClick={() => setSelectedId(q.id)}
                 className={`group flex items-start gap-1 px-2 py-2 rounded-lg cursor-pointer transition-colors
-                  ${selectedId === q.id
-                    ? 'bg-blue-600/20 border border-blue-500/40'
-                    : 'hover:bg-slate-700/60 border border-transparent'}`}>
+                  ${selectedId === q.id ? 'bg-blue-600/20 border border-blue-500/40' : 'hover:bg-slate-700/60 border border-transparent'}`}>
                 <span className="text-[10px] text-slate-500 w-5 shrink-0 mt-0.5">{idx + 1}.</span>
-                <span className="flex-1 text-xs text-slate-300 truncate leading-relaxed">
-                  {q.title || 'Untitled'}
-                </span>
+                <span className="flex-1 text-xs text-slate-300 truncate leading-relaxed">{q.title || 'Untitled'}</span>
                 <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                   <button onClick={e => { e.stopPropagation(); moveQuestion(q.id, -1); }} disabled={idx === 0}
                     className="text-slate-500 hover:text-slate-300 disabled:opacity-30 leading-none" title="Move up">↑</button>
@@ -1017,7 +729,6 @@ export default function QuestionBuilderPage() {
           </div>
         </aside>
 
-        {/* ── Editor ──────────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6">
           {selectedQ
             ? <QuestionEditor question={selectedQ} onChange={updateQuestion} />

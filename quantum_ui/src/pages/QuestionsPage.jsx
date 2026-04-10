@@ -12,6 +12,7 @@ import DraggablePlacedGate from '../components/DraggablePlacedGate';
 import DraggableCnotNode from '../components/DraggableCnotNode';
 import initQuantumEngine from '../wasm/quantum_engine.js';
 import { simulateCircuit } from '../utils/simulateCircuit.js';
+import { applyGateDrop, TWO_WIRE, removeGateFromCircuit } from '../utils/circuitDnD.js';
 
 // ─── Small display components ────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ function FilledBlankGate({ gateName, onClear }) {
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); onClear(); }}
-        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-600 text-slate-200 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-30 leading-none transition-colors"
+        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-600 text-slate-200 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-30 leading-none transition-colors opacity-0 group-hover/filled:opacity-100"
         title="Remove gate"
       >
         ×
@@ -49,13 +50,11 @@ function FilledBlankGate({ gateName, onClear }) {
 
 // ─── Cell renderer ────────────────────────────────────────────────────────────
 
-const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
-
 /**
  * Renders a single cell in the question circuit grid.
  * Returns null for inactive cells so the horizontal wire still shows through.
  */
-function CellContent({ cell, wireIndex, stepIndex, restrictToBlanks, onClear, onDelete }) {
+function CellContent({ cell, wireIndex, stepIndex, restrictToBlanks, onDelete }) {
   if (!cell) {
     if (restrictToBlanks) return null;
     return <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />;
@@ -71,7 +70,7 @@ function CellContent({ cell, wireIndex, stepIndex, restrictToBlanks, onClear, on
     return (
       <FilledBlankGate
         gateName={cell.filled}
-        onClear={() => onClear(wireIndex, stepIndex)}
+        onClear={() => onDelete(wireIndex, stepIndex)}
       />
     );
   }
@@ -163,7 +162,7 @@ function CellContent({ cell, wireIndex, stepIndex, restrictToBlanks, onClear, on
 
 // ─── Circuit board ────────────────────────────────────────────────────────────
 
-function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onClear, onDelete }) {
+function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelete }) {
   return (
     <div className="bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl p-5 inline-block min-w-max relative">
       {circuitState.map((wire, wireIndex) => (
@@ -186,7 +185,6 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onClear
                   wireIndex={wireIndex}
                   stepIndex={stepIndex}
                   restrictToBlanks={restrictToBlanks}
-                  onClear={onClear}
                   onDelete={onDelete}
                 />
               </div>
@@ -366,257 +364,22 @@ export default function QuestionsPage() {
 
         const { wireIndex, stepIndex } = dest.data;
         setCircuitState(prev => {
-          const next = prev.map(w => [...w]);
-          const wIdx = wireIndex;
-          const sIdx = stepIndex;
-          
-          const isOccupied = (w, s) => next[w]?.[s] != null && !next[w][s].blank;
-
-          if (!question.restrictToBlanks) {
-            const isCnotSwap =
-              source.data.type === 'cnot-node' &&
-              dest.data.type === 'cnot-node-drop' &&
-              dest.data.wireIndex === source.data.peerWire &&
-              dest.data.stepIndex === source.data.stepIndex;
-
-            const isToffoliSwap =
-              source.data.type === 'toffoli-node' &&
-              dest.data.type === 'cnot-node-drop' &&
-              (source.data.controls?.includes(dest.data.wireIndex) || source.data.targetWire === dest.data.wireIndex) &&
-              dest.data.stepIndex === source.data.stepIndex;
-
-            if (isToffoliSwap) {
-              const oldWire = source.data.wireIndex;
-              const swapWire = dest.data.wireIndex;
-              const step = source.data.stepIndex;
-              const oldRole = next[oldWire][step].role;
-              const swapRole = next[swapWire][step].role;
-              if (oldRole === swapRole) return next;
-              const controls = [...source.data.controls];
-              let newControls = controls;
-              if (oldRole === 'control') newControls = [swapWire, controls.find(c => c !== oldWire)];
-              else newControls = [oldWire, controls.find(c => c !== swapWire)];
-              const newTarget = oldRole === 'control' ? oldWire : swapWire;
-              next[oldWire][step].role = swapRole;
-              next[swapWire][step].role = oldRole;
-              next[newControls[0]][step].controls = newControls;
-              next[newControls[0]][step].targetWire = newTarget;
-              next[newControls[1]][step].controls = newControls;
-              next[newControls[1]][step].targetWire = newTarget;
-              next[newTarget][step].controls = newControls;
-              next[newTarget][step].targetWire = newTarget;
-              return next;
-            }
-
-            if (isCnotSwap) {
-              const oldWire = source.data.wireIndex;
-              const peerWire = source.data.peerWire;
-              const step = source.data.stepIndex;
-              next[oldWire][step] = {
-                name: source.data.name,
-                role: source.data.role === 'control' ? 'target' : 'control',
-                [source.data.role === 'control' ? 'controlWire' : 'targetWire']: peerWire,
-              };
-              next[peerWire][step] = {
-                name: source.data.name,
-                role: source.data.role,
-                [source.data.role === 'control' ? 'targetWire' : 'controlWire']: oldWire,
-              };
-              return next;
-            }
-
-            const isInsert =
-              dest.data.type === 'gate-insert' ||
-              (dest.data.type === 'cnot-node-drop' && !isCnotSwap);
-
-            if (isInsert) {
-              const insertStep = dest.data.stepIndex;
-              const targetWire = dest.data.wireIndex;
-
-              // Prevent inserting into or before hidden blocks to maintain spatial alignment
-              const affectsHiddenBlock = question.hiddenBlocks?.some(
-                block => insertStep <= block.endStep
-              );
-
-              if (affectsHiddenBlock) {
-                return next;
-              }
-
-              if (source.data.type === 'placed-gate') {
-                next[source.data.wireIndex][source.data.stepIndex] = null;
-              } else if (source.data.type === 'cnot-node') {
-                next[source.data.wireIndex][source.data.stepIndex] = null;
-                next[source.data.peerWire][source.data.stepIndex] = null;
-              } else if (source.data.type === 'toffoli-node') {
-                next[source.data.controls[0]][source.data.stepIndex] = null;
-                next[source.data.controls[1]][source.data.stepIndex] = null;
-                next[source.data.targetWire][source.data.stepIndex] = null;
-              }
-
-              next.forEach(wire => {
-                wire.splice(insertStep, 0, null);
-              });
-
-              if (source.data.type === 'gate') {
-                const gateName = source.data.name;
-                if (TWO_WIRE.includes(gateName)) {
-                  const tIdx = targetWire < next.length - 1 ? targetWire + 1 : targetWire - 1;
-                  if (tIdx >= 0 && tIdx < next.length) {
-                    next[targetWire][insertStep] = { name: gateName, role: 'control', targetWire: tIdx };
-                    next[tIdx][insertStep] = { name: gateName, role: 'target', controlWire: targetWire };
-                  }
-                } else if (gateName === 'TOFFOLI') {
-                  const c1 = targetWire;
-                  if (next.length >= 3) {
-                    const c2 = c1 + 1 < next.length ? c1 + 1 : c1 - 1;
-                    const tIdx = [c1 + 2, c1 - 1, c1 - 2].find(w => w >= 0 && w < next.length && w !== c2) ?? [...Array(next.length).keys()].find(w => w !== c1 && w !== c2);
-                    next[c1][insertStep] = { name: gateName, role: 'control', controls: [c1, c2], targetWire: tIdx };
-                    next[c2][insertStep] = { name: gateName, role: 'control', controls: [c1, c2], targetWire: tIdx };
-                    next[tIdx][insertStep] = { name: gateName, role: 'target', controls: [c1, c2], targetWire: tIdx };
-                  }
-                } else {
-                  next[targetWire][insertStep] = { name: gateName };
-                }
-              } else if (source.data.type === 'placed-gate') {
-                next[targetWire][insertStep] = { name: source.data.name };
-              } else if (source.data.type === 'cnot-node') {
-                next[targetWire][insertStep] = {
-                  name: source.data.name,
-                  role: source.data.role,
-                  [source.data.role === 'control' ? 'targetWire' : 'controlWire']: source.data.peerWire
-                };
-                next[source.data.peerWire][insertStep] = {
-                  name: source.data.name,
-                  role: source.data.role === 'control' ? 'target' : 'control',
-                  [source.data.role === 'control' ? 'controlWire' : 'targetWire']: targetWire
-                };
-              } else if (source.data.type === 'toffoli-node') {
-                next[source.data.controls[0]][insertStep] = { name: source.data.name, role: 'control', controls: source.data.controls, targetWire: source.data.targetWire };
-                next[source.data.controls[1]][insertStep] = { name: source.data.name, role: 'control', controls: source.data.controls, targetWire: source.data.targetWire };
-                next[source.data.targetWire][insertStep] = { name: source.data.name, role: 'target', controls: source.data.controls, targetWire: source.data.targetWire };
-              }
-              return next;
-            }
-          }
-
-          if (source.data.type === 'gate') {
-            const gateName = source.data.name;
-            if (dest.data.type === 'question-blank') {
-              if (!TWO_WIRE.includes(gateName) && gateName !== 'TOFFOLI') {
-                next[wIdx][sIdx] = { blank: true, filled: gateName };
-              }
-              return next;
-            }
-            if (dest.data.type === 'slot') {
-              if (TWO_WIRE.includes(gateName)) {
-                const tIdx = wIdx < next.length - 1 ? wIdx + 1 : wIdx - 1;
-                if (tIdx >= 0 && tIdx < next.length && !isOccupied(wIdx, sIdx) && !isOccupied(tIdx, sIdx)) {
-                  next[wIdx][sIdx] = { name: gateName, role: 'control', targetWire: tIdx };
-                  next[tIdx][sIdx] = { name: gateName, role: 'target', controlWire: wIdx };
-                }
-              } else if (gateName === 'TOFFOLI') {
-                if (next.length >= 3) {
-                  const c2 = wIdx + 1 < next.length ? wIdx + 1 : wIdx - 1;
-                  const tIdx = [wIdx + 2, wIdx - 1, wIdx - 2].find(w => w >= 0 && w < next.length && w !== c2) ?? [...Array(next.length).keys()].find(w => w !== wIdx && w !== c2);
-                  if (!isOccupied(wIdx, sIdx) && !isOccupied(c2, sIdx) && !isOccupied(tIdx, sIdx)) {
-                    next[wIdx][sIdx] = { name: gateName, role: 'control', controls: [wIdx, c2], targetWire: tIdx };
-                    next[c2][sIdx] = { name: gateName, role: 'control', controls: [wIdx, c2], targetWire: tIdx };
-                    next[tIdx][sIdx] = { name: gateName, role: 'target', controls: [wIdx, c2], targetWire: tIdx };
-                  }
-                }
-              } else {
-                if (!isOccupied(wIdx, sIdx)) {
-                  next[wIdx][sIdx] = { name: gateName };
-                }
-              }
-              return next;
-            }
-          }
-
-          if (source.data.type === 'placed-gate' && dest.data.type === 'slot') {
-            if (!isOccupied(wIdx, sIdx)) {
-              next[source.data.wireIndex][source.data.stepIndex] = null;
-              next[wIdx][sIdx] = { name: source.data.name };
-            }
-            return next;
-          }
-
-          if (source.data.type === 'cnot-node' && dest.data.type === 'slot') {
-            const { wireIndex: oldW, stepIndex: oldS, name, role, peerWire } = source.data;
-            if (sIdx === oldS && !isOccupied(wIdx, sIdx) && wIdx !== peerWire) {
-              next[oldW][oldS] = null;
-              next[wIdx][sIdx] = { name, role, [role === 'control' ? 'targetWire' : 'controlWire']: peerWire };
-              next[peerWire][sIdx][role === 'control' ? 'controlWire' : 'targetWire'] = wIdx;
-            }
-            return next;
-          }
-
-          if (source.data.type === 'toffoli-node' && dest.data.type === 'slot') {
-            const { wireIndex: oldW, stepIndex: oldS, name, role, controls, targetWire } = source.data;
-            if (sIdx === oldS && !isOccupied(wIdx, sIdx)) {
-              if (role === 'control' && wIdx !== targetWire && wIdx !== controls.find(c => c !== oldW)) {
-                next[oldW][oldS] = null;
-                const otherC = controls.find(c => c !== oldW);
-                const newControls = [wIdx, otherC];
-                next[wIdx][sIdx] = { name, role, controls: newControls, targetWire };
-                next[otherC][sIdx].controls = newControls;
-                next[targetWire][sIdx].controls = newControls;
-              } else if (role === 'target' && !controls.includes(wIdx)) {
-                next[oldW][oldS] = null;
-                next[wIdx][sIdx] = { name, role, controls, targetWire: wIdx };
-                next[controls[0]][sIdx].targetWire = wIdx;
-                next[controls[1]][sIdx].targetWire = wIdx;
-              }
-            }
-            return next;
-          }
-
-          return next;
+          return applyGateDrop(prev, source.data, dest.data, {
+            hiddenBlocks: question.hiddenBlocks,
+          });
         });
         setFeedback(null);
       },
     });
   }, [question]);
 
-  const clearBlank = useCallback((wireIndex, stepIndex) => {
-    setCircuitState(prev => {
-      const next = prev.map(w => [...w]);
-      const cell = next[wireIndex][stepIndex];
-      if (cell?.blank) next[wireIndex][stepIndex] = { blank: true };
-      return next;
-    });
+  const deleteGate = useCallback((wireIndex, stepIndex) => {
+    setCircuitState(prev => removeGateFromCircuit(prev, wireIndex, stepIndex));
     setFeedback(null);
   }, []);
 
-  const deleteGate = useCallback((wireIndex, stepIndex) => {
-    setCircuitState(prev => {
-      const next = prev.map(w => [...w]);
-      const cell = next[wireIndex][stepIndex];
-      if (!cell || cell.locked || cell.blank) return prev;
-
-      if (TWO_WIRE.includes(cell.name)) {
-        const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
-        next[wireIndex][stepIndex] = null;
-        next[peerWire][stepIndex] = null;
-      } else if (cell.name === 'TOFFOLI') {
-        next[cell.controls[0]][stepIndex] = null;
-        next[cell.controls[1]][stepIndex] = null;
-        next[cell.targetWire][stepIndex] = null;
-      } else {
-        next[wireIndex][stepIndex] = null;
-      }
-      return next;
-    });
-  }, []);
-
   const checkCorrect = useCallback(() => {
-    if (question.evaluationType === 'target_state') {
-      if (!simResults || simResults.probabilities.length === 0) return false;
-      const targetIndex = parseInt(question.targetState, 2);
-      return simResults.probabilities[targetIndex] > 0.99;
-    }
-
-    if (question.evaluationType === 'equivalent_state') {
+    if (!question.restrictToBlanks) {
       if (!simResults || simResults.stateVector.length === 0 || !engine) return false;
 
       // Build the teacher's expected circuit
@@ -806,7 +569,7 @@ export default function QuestionsPage() {
 
           {/* Circuit board */}
           <div className="overflow-auto">
-            <QuestionCircuit circuitState={circuitState} hiddenBlocks={question.hiddenBlocks} restrictToBlanks={question.restrictToBlanks} onClear={clearBlank} onDelete={deleteGate} />
+            <QuestionCircuit circuitState={circuitState} hiddenBlocks={question.hiddenBlocks} restrictToBlanks={question.restrictToBlanks} onDelete={deleteGate} />
           </div>
 
           {/* Controls + feedback */}

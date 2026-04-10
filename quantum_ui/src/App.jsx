@@ -8,6 +8,7 @@ import { SINGLE_QUBIT_GATES, MAX_QUBITS } from './constants';
 import { compactCircuit } from './utils/compactCircuit';
 import { simulateCircuit } from './utils/simulateCircuit';
 import { circuitToCode, parseCode } from './utils/circuitCode';
+import { removeGateFromCircuit } from './utils/circuitDnD';
 import DraggableGate from './components/DraggableGate';
 import DraggableCnotNode from './components/DraggableCnotNode';
 import DraggablePlacedGate from './components/DraggablePlacedGate';
@@ -507,25 +508,7 @@ function App() {
   // ---------------------------------------------------------------------------
   const deleteGate = useCallback((wireIndex, stepIndex) => {
     setCircuit(prev => {
-      const newCircuit = prev.map(wire => [...wire]);
-      const cell = newCircuit[wireIndex][stepIndex];
-      if (!cell) return prev;
-      if (TWO_WIRE.includes(cell.name)) {
-        const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
-        newCircuit[wireIndex][stepIndex] = null;
-        newCircuit[peerWire][stepIndex] = null;
-      } else if (cell.name === 'TOFFOLI') {
-        newCircuit[cell.controls[0]][stepIndex] = null;
-        newCircuit[cell.controls[1]][stepIndex] = null;
-        newCircuit[cell.targetWire][stepIndex] = null;
-      } else if (cell.name === 'BARRIER') {
-        for (let w = cell.topWire; w <= cell.bottomWire; w++) {
-          newCircuit[w][stepIndex] = null;
-        }
-      } else {
-        newCircuit[wireIndex][stepIndex] = null;
-      }
-      return compactCircuit(newCircuit);
+      return compactCircuit(removeGateFromCircuit(prev, wireIndex, stepIndex));
     });
   }, []);
 
