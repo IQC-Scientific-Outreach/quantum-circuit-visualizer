@@ -367,10 +367,26 @@ export default function QuestionsPage() {
       return (realPart * realPart + imagPart * imagPart) > 0.99;
     }
 
-    return question.answer.every(({ wireIndex, stepIndex, gate }) => {
-      const cell = circuitState[wireIndex]?.[stepIndex];
-      return cell?.blank && cell?.filled === gate;
-    });
+    // Strict match for blanks:
+    // Ensure every blank in the student's circuit matches the expected answer (filled or intentionally left empty)
+    for (let w = 0; w < circuitState.length; w++) {
+      for (let s = 0; s < circuitState[w].length; s++) {
+        const cell = circuitState[w][s];
+        if (cell?.blank) {
+          if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') {
+            if (cell.role !== 'control') continue;
+            if (cell.name === 'BLANK_3' && cell.controls && cell.controls[0] !== w) continue;
+          }
+          const expected = (question.answer || []).find(a => a.wireIndex === w && a.stepIndex === s);
+          if (expected) {
+            if (cell.filled !== expected.gate) return false;
+          } else {
+            if (cell.filled) return false;
+          }
+        }
+      }
+    }
+    return true;
   }, [circuitState, question, simResults, engine, shots]);
 
   const advanceQuestion = useCallback((pointsEarned) => {
@@ -399,7 +415,8 @@ export default function QuestionsPage() {
 
   const handleGetAnswer = () => {
     setCircuitState(prev => {
-      let next = prev.map(w => [...w]);
+      // Clear any student-filled blanks first
+      let next = prev.map(w => w.map(c => c?.blank ? { ...c, filled: undefined } : c));
       if (question.answer) {
         question.answer.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
           while (next[0].length <= stepIndex) next.forEach(w => w.push(null));

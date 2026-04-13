@@ -590,7 +590,7 @@ function QuestionEditor({ question: q, onChange }) {
                       value={q.exactAnswer[`${wi}_${si}`] || ''}
                       onChange={e => update({ exactAnswer: { ...q.exactAnswer, [`${wi}_${si}`]: e.target.value } })}
                       className="text-xs bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-slate-200">
-                      <option value="">— select —</option>
+                      <option value="">— leave blank —</option>
                         {options.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                       {type === 'BLANK_2' && <button onClick={() => swapBlank2(wi, si)} className="ml-auto text-[10px] bg-slate-600 hover:bg-slate-500 px-2 py-1 rounded">Swap Control/Target</button>}
