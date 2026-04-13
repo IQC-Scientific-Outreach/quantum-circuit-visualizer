@@ -22,15 +22,16 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
     const el = ref.current;
     if (!el) return;
 
+    const isToffoliType = cell.name === 'TOFFOLI' || cell.name === 'BLANK_3';
     const cleanupDrag = draggable({
       element: el,
       getInitialData: () => ({
-        type: cell.name === 'TOFFOLI' ? 'toffoli-node' : 'cnot-node',
+        type: isToffoliType ? 'toffoli-node' : 'cnot-node',
         name: cell.name,
         role: cell.role,
         wireIndex,
         stepIndex,
-        peerWire: cell.name === 'TOFFOLI' ? undefined : (cell.role === 'control' ? cell.targetWire : cell.controlWire),
+        peerWire: isToffoliType ? undefined : (cell.role === 'control' ? cell.targetWire : cell.controlWire),
         controls: cell.controls,
         targetWire: cell.targetWire,
       }),
@@ -66,6 +67,7 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
   }, [cell, wireIndex, stepIndex]);
 
   const isClassical = cell.name === 'FF_x' || cell.name === 'FF_Z';
+  const isBlank = cell.name === 'BLANK_2' || cell.name === 'BLANK_3';
 
   const baseClasses = `absolute w-full h-full flex items-center justify-center cursor-grab transition-all z-20
     ${isDragging       ? 'opacity-0'                              : 'hover:scale-110'}
@@ -75,19 +77,25 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
   return (
     <div ref={ref} className={baseClasses}>
 
+      {isBlank && (
+        <div className="w-9 h-9 border-2 border-dashed border-slate-500 bg-slate-800/30 rounded flex items-center justify-center">
+          <span className="text-xl font-mono text-slate-600 select-none">?</span>
+        </div>
+      )}
+
       {/* ── Control nodes ── */}
-      {cell.role === 'control' && !isClassical && (
+      {cell.role === 'control' && !isClassical && !isBlank && (
         // CNOT, CZ, or TOFFOLI: quantum filled circle
         <div className="w-3.5 h-3.5 rounded-full bg-slate-300" />
       )}
-      {cell.role === 'control' && isClassical && (
+      {cell.role === 'control' && isClassical && !isBlank && (
         // FF_x or FF_Z: classical filled square
         <div className="w-3.5 h-3.5 rounded-sm bg-amber-400" />
       )}
 
       {/* ── Target nodes ── */}
       {/* CNOT/TOFFOLI target: square with X (slate) */}
-      {cell.role === 'target' && (cell.name === 'CNOT' || cell.name === 'TOFFOLI') && (
+      {cell.role === 'target' && (cell.name === 'CNOT' || cell.name === 'TOFFOLI') && !isBlank && (
         <div className="w-9 h-9 border-2 border-slate-400/80 bg-slate-800/60 rounded flex items-center justify-center">
           <span className="text-slate-200 text-base font-bold leading-none select-none">X</span>
         </div>

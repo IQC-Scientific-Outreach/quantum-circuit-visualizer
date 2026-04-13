@@ -17,6 +17,7 @@ import { applyGateDrop, TWO_WIRE, removeGateFromCircuit } from '../utils/circuit
 import DraggableCnotNode from '../components/DraggableCnotNode';
 import DraggablePlacedGate from '../components/DraggablePlacedGate';
 import DropZone from '../components/DropZone';
+import CircuitCell from '../components/CircuitCell';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -61,7 +62,10 @@ function download(filename, content) {
 
 function serializeCell(cell) {
   if (!cell) return null;
-  if (cell.blank) return { blank: true };
+  if (cell.blank) {
+    if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') return { ...cell, locked: true };
+    return { blank: true, name: 'BLANK' };
+  }
   return { ...cell, locked: true };
 }
 
@@ -153,22 +157,36 @@ function BuilderPaletteGate({ gateName }) {
     });
   }, [gateName]);
 
-  if (gateName === 'BLANK') {
+  if (gateName.startsWith('BLANK')) {
+    let label = 'blank';
+    let widthCls = 'w-12';
+    if (gateName === 'BLANK_2') { label = '2-q blank'; widthCls = 'w-16'; }
+    if (gateName === 'BLANK_3') { label = '3-q blank'; widthCls = 'w-20'; }
+
     return (
-      <div ref={ref} title="Blank slot (student fills)"
-        className={`w-12 h-12 border-2 border-dashed rounded-lg cursor-grab flex flex-col items-center justify-center gap-0.5 select-none transition-opacity
+      <div ref={ref} title={`${label} (student fills)`}
+        className={`${widthCls} h-12 border-2 border-dashed rounded-lg cursor-grab flex flex-col items-center justify-center gap-0.5 select-none transition-opacity
           ${isDragging ? 'opacity-40' : 'border-slate-400 hover:border-blue-400 text-slate-500 hover:text-blue-400'}`}>
         <span className="text-lg font-mono leading-none">?</span>
-        <span className="text-[9px] leading-none">blank</span>
+        <span className="text-[9px] leading-none text-center leading-tight">{label}</span>
       </div>
     );
   }
 
-  const isMulti = TWO_WIRE.includes(gateName) || gateName === 'TOFFOLI';
+  const isMulti = TWO_WIRE.includes(gateName) || gateName === 'TOFFOLI' || gateName === 'BARRIER';
+
+  if (isMulti) {
+    return (
+      <div ref={ref} title={gateName}
+        className={`p-2 cursor-grab flex items-center justify-center font-bold select-none transition-opacity ${GATE_STYLES[gateName] || 'text-slate-300'} ${isDragging ? 'opacity-40' : 'hover:brightness-125 hover:shadow-md'}`}>
+        <GateVisual name={gateName} />
+      </div>
+    );
+  }
+
   return (
     <div ref={ref} title={gateName}
-      className={`border rounded-lg cursor-grab flex items-center justify-center font-bold select-none transition-opacity
-        ${isMulti ? 'px-2 py-1' : 'w-12 h-12 text-sm'}
+      className={`w-12 h-12 text-sm border rounded-lg cursor-grab flex items-center justify-center font-bold select-none transition-opacity
         ${GATE_STYLES[gateName] ?? 'bg-slate-600/30 border-slate-500 text-slate-300'}
         ${isDragging ? 'opacity-40' : 'hover:brightness-125 hover:shadow-md'}`}>
       <GateVisual name={gateName} />
@@ -218,54 +236,6 @@ function DraggableBlankSlot({ wireIndex, stepIndex, onDelete, handleRightClickDe
   );
 }
 
-// ─── BuilderCellContent ───────────────────────────────────────────────────────
-function BuilderCellContent({ cell, wireIndex, stepIndex, onDelete }) {
-  if (!cell) {
-    return <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />;
-  }
-
-  if (cell.blank) {
-    return (
-      <DraggableBlankSlot
-        wireIndex={wireIndex} stepIndex={stepIndex}
-        handleRightClickDelete={(e, w, s) => { e.preventDefault(); onDelete(w, s); }}
-        onDelete={() => onDelete(wireIndex, stepIndex)}
-      />
-    );
-  }
-
-  if (TWO_WIRE.includes(cell.name) || cell.name === 'TOFFOLI') {
-    return (
-      <div className="w-full h-full relative flex items-center justify-center z-20 group/cnot" onContextMenu={(e) => { e.preventDefault(); onDelete(wireIndex, stepIndex); }}>
-        <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
-        {cell.name === 'TOFFOLI' ? (
-          wireIndex === Math.min(...cell.controls, cell.targetWire) && (
-            <>
-              <div className="absolute w-px bg-slate-400 z-0 pointer-events-none" style={{ left: 'calc(50% - 1px)', top: '50%', height: `${(Math.max(...cell.controls, cell.targetWire) - wireIndex) * 5}rem` }} />
-              <button onClick={(e) => { e.stopPropagation(); onDelete(wireIndex, stepIndex); }} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none">×</button>
-            </>
-          )
-        ) : (
-          cell.role === 'control' && (
-            <>
-              <div className="absolute w-px bg-slate-400 z-0 pointer-events-none" style={{ left: 'calc(50% - 1px)', top: cell.targetWire > wireIndex ? '50%' : 'auto', bottom: cell.targetWire < wireIndex ? '50%' : 'auto', height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem` }} />
-              <button onClick={(e) => { e.stopPropagation(); onDelete(wireIndex, stepIndex); }} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none">×</button>
-            </>
-          )
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <DraggablePlacedGate
-      cell={cell} wireIndex={wireIndex} stepIndex={stepIndex}
-      handleRightClickDelete={(e, w, s) => { e.preventDefault(); onDelete(w, s); }}
-      onDelete={() => onDelete(wireIndex, stepIndex)}
-    />
-  );
-}
-
 // ─── BuilderCircuitGrid ───────────────────────────────────────────────────────
 // Full drag-and-drop circuit grid: palette + wires + drop cells.
 //
@@ -303,7 +273,27 @@ function BuilderCircuitGrid({
         if (srcGrid && srcGrid?.getAttribute('data-grid-id') !== gridId) return;
 
         onCellsChange(prevCircuit => {
-          return applyGateDrop(prevCircuit, source.data, dest.data);
+          let proxyName = source.data.name;
+          const isBlank1 = proxyName === 'BLANK';
+          const isBlank2 = proxyName === 'BLANK_2';
+          const isBlank3 = proxyName === 'BLANK_3';
+          
+          if (isBlank1) proxyName = 'H';
+          if (isBlank2) proxyName = 'CNOT';
+          if (isBlank3) proxyName = 'TOFFOLI';
+
+          const res = applyGateDrop(prevCircuit, { ...source.data, name: proxyName }, dest.data);
+          
+          if (isBlank1 || isBlank2 || isBlank3) {
+            return res.map(wire => wire.map(c => {
+              if (c && c.name === proxyName && !prevCircuit.some(pw => pw.includes(c))) {
+                if (isBlank1) return { blank: true, name: 'BLANK' };
+                return { ...c, name: source.data.name, blank: true };
+              }
+              return c;
+            }));
+          }
+          return res;
         });
       },
     });
@@ -316,7 +306,13 @@ function BuilderCircuitGrid({
       {/* ── Gate palette ─────────────────────────────────────────────────── */}
       <div className="flex gap-2 flex-wrap items-end mb-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/40">
         <span className="text-[10px] text-slate-500 uppercase tracking-widest self-center mr-1">Palette</span>
-        {showBlanks && <BuilderPaletteGate gateName="BLANK" />}
+        {showBlanks && (
+          <>
+            <BuilderPaletteGate gateName="BLANK" />
+            <BuilderPaletteGate gateName="BLANK_2" />
+            <BuilderPaletteGate gateName="BLANK_3" />
+          </>
+        )}
         {paletteGates.map(g => <BuilderPaletteGate key={g} gateName={g} />)}
       </div>
 
@@ -354,10 +350,19 @@ function BuilderCircuitGrid({
                 {/* Cells */}
                 {Array.from({ length: nSteps }, (_, s) => (
                   <div key={s} className="w-14 h-14 relative flex items-center justify-center mx-1 z-10">
-                    <BuilderCellContent
+                    <CircuitCell
                       cell={circuit[w]?.[s] ?? null}
                       wireIndex={w} stepIndex={s}
-                      onRemove={() => removeCell(w, s)}
+                      onDelete={(w, s) => removeCell(w, s)}
+                      customRenderer={(cell, cw, cs) => {
+                        if (cell && cell.blank && (!cell.name || cell.name === 'BLANK')) {
+                          return <DraggableBlankSlot
+                            wireIndex={cw} stepIndex={cs}
+                            handleRightClickDelete={(e, w2, s2) => { e.preventDefault(); removeCell(w2, s2); }}
+                            onDelete={() => removeCell(cw, cs)}
+                          />;
+                        }
+                      }}
                     />
                   </div>
                 ))}
@@ -442,8 +447,35 @@ function QuestionEditor({ question: q, onChange }) {
   // ── Blank positions (exact answer section) ────────────────────────────────
   const blanks = [];
   q.circuit.forEach((wire, wi) =>
-    wire.forEach((cell, si) => { if (cell?.blank) blanks.push({ wi, si }); })
+    wire.forEach((cell, si) => { 
+      if (cell?.blank) {
+        if (!cell.name || cell.name === 'BLANK') blanks.push({ wi, si, type: 'single', cell });
+        else if (cell.role === 'control') {
+          if (cell.name === 'BLANK_3' && cell.controls && cell.controls[0] !== wi) return;
+          blanks.push({ wi, si, type: cell.name, cell });
+        }
+      }
+    })
   );
+
+  function swapBlank2(w, s) {
+    const newCircuit = q.circuit.map(wire => [...wire]);
+    const cell = newCircuit[w][s];
+    const peer = cell.targetWire;
+    newCircuit[w][s] = { ...cell, role: 'target', controlWire: peer, targetWire: undefined };
+    newCircuit[peer][s] = { ...newCircuit[peer][s], role: 'control', targetWire: w, controlWire: undefined };
+    update({ circuit: newCircuit });
+  }
+  function rotateBlank3(w, s) {
+    const newCircuit = q.circuit.map(wire => [...wire]);
+    const cell = newCircuit[w][s];
+    const newT = cell.controls[0];
+    const newC = [cell.targetWire, cell.controls[1]].sort((a,b) => a - b);
+    newCircuit[newT][s] = { ...newCircuit[newT][s], role: 'target', controls: newC, targetWire: newT };
+    newCircuit[newC[0]][s] = { ...newCircuit[newC[0]][s], role: 'control', controls: newC, targetWire: newT };
+    newCircuit[newC[1]][s] = { ...newCircuit[newC[1]][s], role: 'control', controls: newC, targetWire: newT };
+    update({ circuit: newCircuit });
+  }
 
   function toggleGate(gate) {
     update({ allowedGates: q.allowedGates.includes(gate) ? q.allowedGates.filter(g => g !== gate) : [...q.allowedGates, gate] });
@@ -523,7 +555,7 @@ function QuestionEditor({ question: q, onChange }) {
           onCellsChange={handleCircuitChange}
           onAddWire={addWire} onRemoveWire={removeWire}
           onAddStep={addStep} onRemoveStep={removeStep}
-          showBlanks paletteGates={ALL_PALETTE_GATES}
+          showBlanks={q.restrictToBlanks} paletteGates={ALL_PALETTE_GATES}
         />
       </section>
 
@@ -540,19 +572,32 @@ function QuestionEditor({ question: q, onChange }) {
               <p className="text-xs text-slate-500 italic">No blanks yet — add Blank tiles to the given circuit above.</p>
             ) : (
               <div className="space-y-2">
-                {blanks.map(({ wi, si }) => (
-                  <div key={`${wi}_${si}`} className="flex items-center gap-3 p-3 bg-slate-700/60 rounded-lg border border-slate-600/50">
-                    <span className="text-xs text-slate-300 w-28 shrink-0">Qubit {wi} · Step {si}</span>
+                {blanks.map(({ wi, si, type, cell }) => {
+                  let options = [];
+                  if (type === 'single') options = q.allowedGates.filter(g => SINGLE_GATES.includes(g));
+                  if (type === 'BLANK_2') options = q.allowedGates.filter(g => TWO_WIRE.includes(g));
+                  if (type === 'BLANK_3') options = q.allowedGates.filter(g => g === 'TOFFOLI');
+                  
+                  let label = `Qubit ${wi} · Step ${si}`;
+                  if (type === 'BLANK_2') label = `Control: ${wi}, Target: ${cell.targetWire} · Step ${si}`;
+                  if (type === 'BLANK_3') label = `Controls: ${cell.controls[0]}, ${cell.controls[1]}, Target: ${cell.targetWire} · Step ${si}`;
+
+                  return (
+                    <div key={`${wi}_${si}`} className="flex items-center gap-3 p-3 bg-slate-700/60 rounded-lg border border-slate-600/50">
+                      <span className="text-xs text-slate-300 w-48 shrink-0">{label}</span>
                     <span className="text-xs text-slate-500">correct gate →</span>
                     <select
                       value={q.exactAnswer[`${wi}_${si}`] || ''}
                       onChange={e => update({ exactAnswer: { ...q.exactAnswer, [`${wi}_${si}`]: e.target.value } })}
                       className="text-xs bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-slate-200">
                       <option value="">— select —</option>
-                      {q.allowedGates.filter(g => SINGLE_GATES.includes(g)).map(g => <option key={g} value={g}>{g}</option>)}
+                        {options.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
+                      {type === 'BLANK_2' && <button onClick={() => swapBlank2(wi, si)} className="ml-auto text-[10px] bg-slate-600 hover:bg-slate-500 px-2 py-1 rounded">Swap Control/Target</button>}
+                      {type === 'BLANK_3' && <button onClick={() => rotateBlank3(wi, si)} className="ml-auto text-[10px] bg-slate-600 hover:bg-slate-500 px-2 py-1 rounded">Rotate Target</button>}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
@@ -664,7 +709,14 @@ export default function QuestionBuilderPage() {
           const syncedData = data.map(q => {
             let ac = q.answerCircuit || [[null]];
             while (ac.length < (q.nQubits || 1)) ac.push(Array(q.answerNSteps || 1).fill(null));
-            return { ...q, answerNQubits: q.nQubits || 1, answerCircuit: ac.slice(0, q.nQubits || 1) };
+            
+            let exactAnswer = q.exactAnswer || {};
+            if (q.restrictToBlanks && q.answer && Object.keys(exactAnswer).length === 0) {
+              q.answer.forEach(ans => {
+                exactAnswer[`${ans.wireIndex}_${ans.stepIndex}`] = ans.gate;
+              });
+            }
+            return { ...q, answerNQubits: q.nQubits || 1, answerCircuit: ac.slice(0, q.nQubits || 1), exactAnswer };
           });
           setQuestions(syncedData); setSelectedId(syncedData[0].id);
           _nextId = Math.max(...data.map(q => q.id ?? 0)) + 1;

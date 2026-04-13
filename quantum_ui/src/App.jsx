@@ -13,6 +13,7 @@ import DraggableGate from './components/DraggableGate';
 import DraggableCnotNode from './components/DraggableCnotNode';
 import DraggablePlacedGate from './components/DraggablePlacedGate';
 import DraggableBarrier from './components/DraggableBarrier';
+import CircuitCell from './components/CircuitCell';
 import DropZone from './components/DropZone';
 import ResultsPanel from './components/ResultsPanel';
 import './App.css'
@@ -752,95 +753,16 @@ function App() {
                     key={`slot-${wireIndex}-${stepIndex}`}
                     className={`w-14 h-14 relative flex items-center justify-center mx-1 z-10 ${cell?.name === 'BARRIER' ? 'overflow-visible' : ''}`}
                   >
-                    {cell ? (
-                      cell.name === 'BARRIER' ? (
-                        <div
-                          className="w-full h-full relative flex items-center justify-center z-20 overflow-visible"
-                          onContextMenu={(e) => handleRightClickDelete(e, wireIndex, stepIndex)}
-                        >
-                          <DraggableBarrier
-                            cell={cell}
-                            wireIndex={wireIndex}
-                            stepIndex={stepIndex}
-                            isHovered={hoveredBarrier === `${stepIndex}-${cell.topWire}-${cell.bottomWire}`}
-                            onHoverChange={(on) => setHoveredBarrier(on ? `${stepIndex}-${cell.topWire}-${cell.bottomWire}` : null)}
-                            onDelete={() => deleteGate(wireIndex, stepIndex)}
-                            onResize={(action) => resizeBarrier(wireIndex, stepIndex, action)}
-                          />
-                        </div>
-                      ) : (TWO_WIRE.includes(cell.name) || cell.name === 'TOFFOLI') ? (
-                        <div
-                          className="w-full h-full relative flex items-center justify-center z-20 group/cnot"
-                          onContextMenu={(e) => handleRightClickDelete(e, wireIndex, stepIndex)}
-                        >
-                          <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
-
-                          {cell.name === 'TOFFOLI' ? (
-                            wireIndex === Math.min(...cell.controls, cell.targetWire) && (
-                              <>
-                                <div
-                                  className="absolute w-px bg-slate-400 z-0 pointer-events-none"
-                                  style={{
-                                    left: 'calc(50% - 1px)',
-                                    top: '50%',
-                                    height: `${(Math.max(...cell.controls, cell.targetWire) - wireIndex) * 5}rem`,
-                                  }}
-                                />
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); deleteGate(wireIndex, stepIndex); }}
-                                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none"
-                                  title="Delete gate"
-                                >×</button>
-                              </>
-                            )
-                          ) : (
-                            cell.role === 'control' && (
-                              <>
-                                {(cell.name === 'CNOT' || cell.name === 'CZ') ? (
-                                  <div
-                                    className="absolute w-px bg-slate-400 z-0 pointer-events-none"
-                                    style={{
-                                      left: 'calc(50% - 1px)',
-                                      top: cell.targetWire > wireIndex ? '50%' : 'auto',
-                                      bottom: cell.targetWire < wireIndex ? '50%' : 'auto',
-                                      height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem`,
-                                    }}
-                                  />
-                                ) : (
-                                  <div
-                                    className="absolute z-0 pointer-events-none"
-                                    style={{
-                                      left: 'calc(50% - 3px)',
-                                      top: cell.targetWire > wireIndex ? '50%' : 'auto',
-                                      bottom: cell.targetWire < wireIndex ? '50%' : 'auto',
-                                      height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem`,
-                                      width: '6px',
-                                      borderLeft:  '1.5px solid rgba(251,191,36,0.6)',
-                                      borderRight: '1.5px solid rgba(251,191,36,0.6)',
-                                    }}
-                                  />
-                                )}
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); deleteGate(wireIndex, stepIndex); }}
-                                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none"
-                                  title="Delete gate"
-                                >×</button>
-                              </>
-                            )
-                          )}
-                        </div>
-                      ) : (
-                        <DraggablePlacedGate
-                          cell={cell}
-                          wireIndex={wireIndex}
-                          stepIndex={stepIndex}
-                          handleRightClickDelete={handleRightClickDelete}
-                          onDelete={() => deleteGate(wireIndex, stepIndex)}
-                        />
-                      )
-                    ) : (
-                      <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />
-                    )}
+                    <CircuitCell
+                      cell={cell}
+                      wireIndex={wireIndex}
+                      stepIndex={stepIndex}
+                      onDelete={deleteGate}
+                      onRightClickDelete={handleRightClickDelete}
+                      hoveredBarrier={hoveredBarrier}
+                      onHoverBarrier={setHoveredBarrier}
+                      onResizeBarrier={resizeBarrier}
+                    />
                   </div>
                 ))}
               </div>

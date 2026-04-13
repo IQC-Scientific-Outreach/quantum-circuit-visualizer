@@ -8,6 +8,7 @@ import DraggableGate from '../components/DraggableGate';
 import QuestionBlankSlot from '../components/question/QuestionBlankSlot';
 import ResultsPanel from '../components/ResultsPanel';
 import DropZone from '../components/DropZone';
+import CircuitCell from '../components/CircuitCell';
 import DraggablePlacedGate from '../components/DraggablePlacedGate';
 import DraggableCnotNode from '../components/DraggableCnotNode';
 import initQuantumEngine from '../wasm/quantum_engine.js';
@@ -50,119 +51,55 @@ function FilledBlankGate({ gateName, onClear }) {
 
 // ─── Cell renderer ────────────────────────────────────────────────────────────
 
-/**
- * Renders a single cell in the question circuit grid.
- * Returns null for inactive cells so the horizontal wire still shows through.
- */
-function CellContent({ cell, wireIndex, stepIndex, restrictToBlanks, onDelete }) {
-  if (!cell) {
-    if (restrictToBlanks) return null;
-    return <DropZone wireIndex={wireIndex} stepIndex={stepIndex} />;
-  }
-
-  // Blank slot (unfilled)
-  if (cell.blank && !cell.filled) {
-    return <QuestionBlankSlot wireIndex={wireIndex} stepIndex={stepIndex} />;
-  }
-
-  // Blank slot (filled by student)
-  if (cell.blank && cell.filled) {
-    return (
-      <FilledBlankGate
-        gateName={cell.filled}
-        onClear={() => onDelete(wireIndex, stepIndex)}
-      />
-    );
-  }
-
-  // Locked single-qubit gate
-  if (cell.locked && !TWO_WIRE.includes(cell.name)) {
-    return <LockedGate cell={cell} />;
-  }
-
-  // Locked multi-qubit control node + connecting line
-  if (cell.locked && TWO_WIRE.includes(cell.name) && cell.role === 'control') {
-    const diff = cell.targetWire - wireIndex;
-    return (
-      <div className="w-full h-full relative flex items-center justify-center">
-        <div className="w-3.5 h-3.5 rounded-full bg-slate-300 z-10" />
-        <div
-          className="absolute w-px bg-slate-400 pointer-events-none"
-          style={{
-            left: 'calc(50% - 0.5px)',
-            top: diff > 0 ? '50%' : 'auto',
-            bottom: diff < 0 ? '50%' : 'auto',
-            height: `${Math.abs(diff) * 5}rem`,
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Locked CNOT target node
-  if (cell.locked && cell.name === 'CNOT' && cell.role === 'target') {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className={`w-9 h-9 border-2 border-slate-400/80 bg-slate-800/60 rounded flex items-center justify-center select-none`}>
-          <span className="text-slate-200 text-base font-bold leading-none">X</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Locked CZ target node
-  if (cell.locked && cell.name === 'CZ' && cell.role === 'target') {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className={`w-9 h-9 border border-slate-400/70 bg-slate-500/10 rounded flex items-center justify-center select-none`}>
-          <span className="text-slate-300 text-base font-bold leading-none">Z</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (cell.locked && !TWO_WIRE.includes(cell.name)) {
-    return <LockedGate cell={cell} />;
-  }
-
-  // Placed unlocked gates (student placed in empty slots)
-  if (TWO_WIRE.includes(cell.name) || cell.name === 'TOFFOLI') {
-    return (
-      <div className="w-full h-full relative flex items-center justify-center z-20 group/cnot" onContextMenu={(e) => { e.preventDefault(); onDelete(wireIndex, stepIndex); }}>
-        <DraggableCnotNode cell={cell} wireIndex={wireIndex} stepIndex={stepIndex} />
-        {cell.name === 'TOFFOLI' ? (
-          wireIndex === Math.min(...cell.controls, cell.targetWire) && (
-            <>
-              <div className="absolute w-px bg-slate-400 z-0 pointer-events-none" style={{ left: 'calc(50% - 1px)', top: '50%', height: `${(Math.max(...cell.controls, cell.targetWire) - wireIndex) * 5}rem` }} />
-              <button onClick={(e) => { e.stopPropagation(); onDelete(wireIndex, stepIndex); }} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none">×</button>
-            </>
-          )
-        ) : (
-          cell.role === 'control' && (
-            <>
-              <div className="absolute w-px bg-slate-400 z-0 pointer-events-none" style={{ left: 'calc(50% - 1px)', top: cell.targetWire > wireIndex ? '50%' : 'auto', bottom: cell.targetWire < wireIndex ? '50%' : 'auto', height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem` }} />
-              <button onClick={(e) => { e.stopPropagation(); onDelete(wireIndex, stepIndex); }} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white text-[10px] flex items-center justify-center z-40 opacity-0 group-hover/cnot:opacity-100 transition-opacity leading-none">×</button>
-            </>
-          )
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <DraggablePlacedGate
-      cell={cell}
-      wireIndex={wireIndex}
-      stepIndex={stepIndex}
-      handleRightClickDelete={(e, w, s) => { e.preventDefault(); onDelete(w, s); }}
-      onDelete={() => onDelete(wireIndex, stepIndex)}
-    />
-  );
-}
 
 // ─── Circuit board ────────────────────────────────────────────────────────────
 
 function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelete }) {
+  const customRenderer = useCallback((cell, wireIndex, stepIndex) => {
+    if (!cell) {
+      if (restrictToBlanks) return null;
+      return undefined; // Handled by standard empty slot renderer inside CircuitCell
+    }
+
+    if (cell.blank && !cell.filled) {
+      if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') {
+        return (
+          <div className="w-full h-full relative flex items-center justify-center z-20 group/cnot">
+            <QuestionBlankSlot wireIndex={wireIndex} stepIndex={stepIndex} />
+            {cell.name === 'BLANK_3' ? (
+              wireIndex === Math.min(...cell.controls, cell.targetWire) && <div className="absolute w-px bg-slate-400 z-0 pointer-events-none" style={{ left: 'calc(50% - 1px)', top: '50%', height: `${(Math.max(...cell.controls, cell.targetWire) - wireIndex) * 5}rem` }} />
+            ) : (
+              cell.role === 'control' && <div className="absolute w-px bg-slate-400 z-0 pointer-events-none" style={{ left: 'calc(50% - 1px)', top: cell.targetWire > wireIndex ? '50%' : 'auto', bottom: cell.targetWire < wireIndex ? '50%' : 'auto', height: `${Math.abs(cell.targetWire - wireIndex) * 5}rem` }} />
+            )}
+          </div>
+        );
+      }
+      return <QuestionBlankSlot wireIndex={wireIndex} stepIndex={stepIndex} />;
+    }
+
+    if (cell.blank && cell.filled) {
+      if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') {
+        return <CircuitCell cell={{ ...cell, name: cell.filled }} wireIndex={wireIndex} stepIndex={stepIndex} onDelete={onDelete} onRightClickDelete={(e) => { e.preventDefault(); onDelete(wireIndex, stepIndex); }} />;
+      }
+      return <FilledBlankGate gateName={cell.filled} onClear={() => onDelete(wireIndex, stepIndex)} />;
+    }
+
+    if (cell.locked && TWO_WIRE.includes(cell.name) && cell.role === 'control') {
+      const diff = cell.targetWire - wireIndex;
+      return (
+        <div className="w-full h-full relative flex items-center justify-center">
+          <div className="w-3.5 h-3.5 rounded-full bg-slate-300 z-10" />
+          <div className="absolute w-px bg-slate-400 pointer-events-none" style={{ left: 'calc(50% - 0.5px)', top: diff > 0 ? '50%' : 'auto', bottom: diff < 0 ? '50%' : 'auto', height: `${Math.abs(diff) * 5}rem` }} />
+        </div>
+      );
+    }
+    if (cell.locked && cell.name === 'CNOT' && cell.role === 'target') return <div className="w-full h-full flex items-center justify-center"><div className={`w-9 h-9 border-2 border-slate-400/80 bg-slate-800/60 rounded flex items-center justify-center select-none`}><span className="text-slate-200 text-base font-bold leading-none">X</span></div></div>;
+    if (cell.locked && cell.name === 'CZ' && cell.role === 'target') return <div className="w-full h-full flex items-center justify-center"><div className={`w-9 h-9 border border-slate-400/70 bg-slate-500/10 rounded flex items-center justify-center select-none`}><span className="text-slate-300 text-base font-bold leading-none">Z</span></div></div>;
+    if (cell.locked && !TWO_WIRE.includes(cell.name)) return <LockedGate cell={cell} />;
+
+    return undefined; 
+  }, [restrictToBlanks, onDelete]);
+
   return (
     <div className="bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl p-5 inline-block min-w-max relative">
       {circuitState.map((wire, wireIndex) => (
@@ -180,11 +117,11 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelet
                 key={`slot-${wireIndex}-${stepIndex}`}
                 className="w-14 h-14 relative flex items-center justify-center mx-1 z-10"
               >
-                <CellContent
+                <CircuitCell
                   cell={cell}
                   wireIndex={wireIndex}
                   stepIndex={stepIndex}
-                  restrictToBlanks={restrictToBlanks}
+                  customRenderer={customRenderer}
                   onDelete={onDelete}
                 />
               </div>
@@ -364,6 +301,17 @@ export default function QuestionsPage() {
 
         const { wireIndex, stepIndex } = dest.data;
         setCircuitState(prev => {
+          const cell = prev[wireIndex]?.[stepIndex];
+          if (cell?.blank && (cell.name === 'BLANK_2' || cell.name === 'BLANK_3')) {
+            const is2Wire = TWO_WIRE.includes(source.data.name);
+            const is3Wire = source.data.name === 'TOFFOLI';
+            if ((cell.name === 'BLANK_2' && is2Wire) || (cell.name === 'BLANK_3' && is3Wire)) {
+              return prev.map(w => w.map((c, si) => 
+                (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: source.data.name } : c
+              ));
+            }
+            return prev;
+          }
           return applyGateDrop(prev, source.data, dest.data, {
             hiddenBlocks: question.hiddenBlocks,
           });
@@ -374,7 +322,15 @@ export default function QuestionsPage() {
   }, [question]);
 
   const deleteGate = useCallback((wireIndex, stepIndex) => {
-    setCircuitState(prev => removeGateFromCircuit(prev, wireIndex, stepIndex));
+    setCircuitState(prev => {
+      const cell = prev[wireIndex]?.[stepIndex];
+      if (cell?.blank && (cell.name === 'BLANK_2' || cell.name === 'BLANK_3')) {
+        return prev.map(w => w.map((c, si) => 
+          (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: undefined } : c
+        ));
+      }
+      return removeGateFromCircuit(prev, wireIndex, stepIndex);
+    });
     setFeedback(null);
   }, []);
 
@@ -443,15 +399,22 @@ export default function QuestionsPage() {
 
   const handleGetAnswer = () => {
     setCircuitState(prev => {
-      const next = prev.map(w => [...w]);
+      let next = prev.map(w => [...w]);
       if (question.answer) {
         question.answer.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
           while (next[0].length <= stepIndex) next.forEach(w => w.push(null));
           if (role) {
             next[wireIndex][stepIndex] = { name: gate, role, targetWire, controlWire, controls };
           } else {
-            if (next[wireIndex][stepIndex]?.blank) {
-              next[wireIndex][stepIndex] = { blank: true, filled: gate };
+            const cell = next[wireIndex][stepIndex];
+            if (cell?.blank) {
+              if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') {
+                 next = next.map(w => w.map((c, si) => 
+                   (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: gate } : c
+                 ));
+              } else {
+                 next[wireIndex][stepIndex] = { ...cell, filled: gate };
+              }
             } else {
               next[wireIndex][stepIndex] = { name: gate };
             }
