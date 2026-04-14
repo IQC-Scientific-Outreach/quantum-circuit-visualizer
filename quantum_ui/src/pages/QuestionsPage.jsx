@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { QUESTIONS } from '../questions/questionData';
@@ -14,6 +14,8 @@ import DraggableCnotNode from '../components/DraggableCnotNode';
 import initQuantumEngine from '../wasm/quantum_engine.js';
 import { simulateCircuit } from '../utils/simulateCircuit.js';
 import { applyGateDrop, TWO_WIRE, removeGateFromCircuit } from '../utils/circuitDnD.js';
+import { compactCircuit } from '../utils/compactCircuit.js';
+import { decodeStudentPackage } from '../utils/questionPackage.js';
 
 // ─── Small display components ────────────────────────────────────────────────
 
@@ -49,16 +51,18 @@ function FilledBlankGate({ gateName, onClear }) {
   );
 }
 
-// ─── Cell renderer ────────────────────────────────────────────────────────────
-
-
 // ─── Circuit board ────────────────────────────────────────────────────────────
 
-function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelete }) {
+/**
+ * separatorStep: if provided, draws a thin divider line before that column
+ * to mark the boundary between the "given" question circuit and the
+ * student-editable area (used for restrictToBlanks: false questions).
+ */
+function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelete, separatorStep }) {
   const customRenderer = useCallback((cell, wireIndex, stepIndex) => {
     if (!cell) {
       if (restrictToBlanks) return null;
-      return undefined; // Handled by standard empty slot renderer inside CircuitCell
+      return undefined;
     }
 
     if (cell.blank && !cell.filled) {
@@ -93,39 +97,50 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelet
         </div>
       );
     }
-    if (cell.locked && cell.name === 'CNOT' && cell.role === 'target') return <div className="w-full h-full flex items-center justify-center"><div className={`w-9 h-9 border-2 border-slate-400/80 bg-slate-800/60 rounded flex items-center justify-center select-none`}><span className="text-slate-200 text-base font-bold leading-none">X</span></div></div>;
-    if (cell.locked && cell.name === 'CZ' && cell.role === 'target') return <div className="w-full h-full flex items-center justify-center"><div className={`w-9 h-9 border border-slate-400/70 bg-slate-500/10 rounded flex items-center justify-center select-none`}><span className="text-slate-300 text-base font-bold leading-none">Z</span></div></div>;
+    if (cell.locked && cell.name === 'CNOT' && cell.role === 'target') return <div className="w-full h-full flex items-center justify-center"><div className="w-9 h-9 border-2 border-slate-400/80 bg-slate-800/60 rounded flex items-center justify-center select-none"><span className="text-slate-200 text-base font-bold leading-none">X</span></div></div>;
+    if (cell.locked && cell.name === 'CZ'   && cell.role === 'target') return <div className="w-full h-full flex items-center justify-center"><div className="w-9 h-9 border border-slate-400/70 bg-slate-500/10 rounded flex items-center justify-center select-none"><span className="text-slate-300 text-base font-bold leading-none">Z</span></div></div>;
     if (cell.locked && !TWO_WIRE.includes(cell.name)) return <LockedGate cell={cell} />;
 
-    return undefined; 
+    return undefined;
   }, [restrictToBlanks, onDelete]);
 
   return (
     <div className="bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl p-5 inline-block min-w-max relative">
       {circuitState.map((wire, wireIndex) => (
         <div key={`wire-${wireIndex}`} className="flex items-center mb-2 last:mb-0">
-          {/* Wire label */}
           <div className="w-16 font-mono font-medium text-right pr-4 text-sm text-slate-400 shrink-0">
             q[{wireIndex}]
           </div>
-
-          {/* Slots with wire line */}
           <div className="flex relative items-center py-2 px-1">
             <div className="absolute left-0 right-0 h-px bg-slate-600 z-0" />
-            {wire.map((cell, stepIndex) => (
-              <div
-                key={`slot-${wireIndex}-${stepIndex}`}
-                className="w-14 h-14 relative flex items-center justify-center mx-1 z-10"
-              >
-                <CircuitCell
-                  cell={cell}
-                  wireIndex={wireIndex}
-                  stepIndex={stepIndex}
-                  customRenderer={customRenderer}
-                  onDelete={onDelete}
-                />
-              </div>
-            ))}
+            {wire.flatMap((cell, stepIndex) => {
+              const elements = [];
+              // Divider between given circuit and student-editable area
+              if (separatorStep != null && stepIndex === separatorStep) {
+                elements.push(
+                  <div
+                    key={`sep-${wireIndex}`}
+                    className="w-0.5 h-10 bg-blue-500/40 mx-1.5 shrink-0 self-center rounded-full"
+                    title="Student circuit starts here"
+                  />
+                );
+              }
+              elements.push(
+                <div
+                  key={`slot-${wireIndex}-${stepIndex}`}
+                  className="w-14 h-14 relative flex items-center justify-center mx-1 z-10"
+                >
+                  <CircuitCell
+                    cell={cell}
+                    wireIndex={wireIndex}
+                    stepIndex={stepIndex}
+                    customRenderer={customRenderer}
+                    onDelete={onDelete}
+                  />
+                </div>
+              );
+              return elements;
+            })}
           </div>
         </div>
       ))}
@@ -136,10 +151,10 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelet
           key={`hidden-${i}`}
           className="absolute z-40 bg-slate-800/95 border border-slate-600 rounded-lg flex items-center justify-center backdrop-blur-sm shadow-xl"
           style={{
-            top: `calc(1.25rem + ${block.topWire} * 5rem)`,
-            left: `calc(5.75rem + ${block.startStep} * 4rem)`,
-            width: `calc(${(block.endStep - block.startStep + 1)} * 4rem - 0.5rem)`,
-            height: `calc(${(block.bottomWire - block.topWire + 1)} * 5rem - 0.5rem)`
+            top:    `calc(1.25rem + ${block.topWire}   * 5rem)`,
+            left:   `calc(5.75rem + ${block.startStep} * 4rem)`,
+            width:  `calc(${(block.endStep - block.startStep + 1)} * 4rem - 0.5rem)`,
+            height: `calc(${(block.bottomWire - block.topWire  + 1)} * 5rem - 0.5rem)`,
           }}
         >
           <span className="text-slate-400 font-bold tracking-widest uppercase text-xs">Hidden Circuit</span>
@@ -151,9 +166,9 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelet
 
 // ─── Final score screen ───────────────────────────────────────────────────────
 
-function FinalScreen({ scores, onRetry }) {
+function FinalScreen({ scores, questions, onRetry }) {
   const totalPoints = scores.reduce((s, r) => s + r.points, 0);
-  const maxPoints = QUESTIONS.reduce((s, q) => s + q.points, 0);
+  const maxPoints   = questions.reduce((s, q) => s + q.points, 0);
   const pct = maxPoints > 0 ? Math.round((totalPoints / maxPoints) * 100) : 0;
 
   return (
@@ -167,22 +182,17 @@ function FinalScreen({ scores, onRetry }) {
         <span className="text-slate-600 ml-2">({pct}%)</span>
       </p>
 
-      {/* Per-question breakdown */}
       <div className="bg-slate-900 border border-slate-700/50 rounded-xl p-5 flex flex-col gap-3 min-w-80">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1">
-          Breakdown
-        </p>
-        {QUESTIONS.map((q, i) => {
+        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1">Breakdown</p>
+        {questions.map((q, i) => {
           const s = scores[i];
           const earned = s?.points ?? 0;
-          const hint = s?.usedHint;
+          const hint   = s?.usedHint;
           return (
             <div key={q.id} className="flex justify-between items-center text-sm gap-4">
               <span className="text-slate-300 truncate">{q.title}</span>
               <span className="shrink-0">
-                {hint && (
-                  <span className="text-amber-500/80 text-xs mr-2">(revealed)</span>
-                )}
+                {hint && <span className="text-amber-500/80 text-xs mr-2">(revealed)</span>}
                 <span className={earned > 0 ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>
                   {earned} / {q.points} pts
                 </span>
@@ -212,9 +222,8 @@ function FinalScreen({ scores, onRetry }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-/** Build fresh mutable circuit state from a question definition. */
 function initCircuit(question) {
-  const minLength = Math.max(...question.circuit.map(w => w.length));
+  const minLength     = Math.max(...question.circuit.map(w => w.length));
   const desiredLength = question.restrictToBlanks ? minLength : Math.max(8, minLength + 3);
   return question.circuit.map(wire =>
     [...wire.map(cell => (cell ? { ...cell } : null)), ...Array(Math.max(0, desiredLength - minLength)).fill(null)]
@@ -222,22 +231,55 @@ function initCircuit(question) {
 }
 
 export default function QuestionsPage() {
+  // ── Active question set (default = built-in, replaced when a .qpkg is loaded) ──
+  const [activeQuestions, setActiveQuestions] = useState(QUESTIONS);
+  const [quizTitle, setQuizTitle]             = useState(null); // null = practice mode
+  const quizFileRef = useRef(null);
+
   const [questionIndex, setQuestionIndex] = useState(0);
-  const [scores, setScores] = useState([]); // [{ questionId, points, usedHint }]
-  const [phase, setPhase] = useState('playing'); // 'playing' | 'done'
+  const [scores, setScores]               = useState([]);
+  const [phase, setPhase]                 = useState('playing');
 
-  const question = QUESTIONS[questionIndex];
+  const question = activeQuestions[questionIndex];
 
-  const [circuitState, setCircuitState] = useState(() => initCircuit(question));
-  const [feedback, setFeedback] = useState(null); // null | 'correct' | 'incorrect'
-  const [answerRevealed, setAnswerRevealed] = useState(false);
+  const [circuitState,    setCircuitState]    = useState(() => initCircuit(question));
+  const [feedback,        setFeedback]        = useState(null);
+  const [answerRevealed,  setAnswerRevealed]  = useState(false);
 
-  const [engine, setEngine] = useState(null);
-  const [isReady, setIsReady] = useState(false);
+  const [engine,   setEngine]   = useState(null);
+  const [isReady,  setIsReady]  = useState(false);
   const [simResults, setSimResults] = useState(null);
   const [shots, setShots] = useState(100);
 
-  // Load Quantum Engine
+  // ── Helper: reset everything for a given question set ──────────────────────
+  function startQuiz(qs) {
+    setActiveQuestions(qs);
+    setQuestionIndex(0);
+    setScores([]);
+    setPhase('playing');
+    setCircuitState(initCircuit(qs[0]));
+    setFeedback(null);
+    setAnswerRevealed(false);
+  }
+
+  // ── Load .qpkg file ─────────────────────────────────────────────────────────
+  function handleLoadQuizFile(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const payload = decodeStudentPackage(ev.target.result);
+        setQuizTitle(payload.meta?.title || 'Quiz');
+        startQuiz(payload.questions);
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  // ── Load Quantum Engine ─────────────────────────────────────────────────────
   useEffect(() => {
     async function loadEngine() {
       try {
@@ -249,26 +291,26 @@ export default function QuestionsPage() {
     loadEngine();
   }, []);
 
-  // Simulate circuit whenever circuitState changes
+  // ── Simulate circuit whenever circuitState changes ──────────────────────────
   useEffect(() => {
     if (isReady && engine) {
       const normalizedCircuit = circuitState.map(wire => wire.map(cell => {
         if (!cell) return null;
-        if (cell.blank) return cell.filled ? { name: cell.filled } : null;
+        if (cell.blank) return cell.filled ? { ...cell, name: cell.filled } : null;
         return { ...cell };
       }));
       setSimResults(simulateCircuit(engine, normalizedCircuit, null, shots, null));
     }
   }, [circuitState, isReady, engine, shots]);
 
-  // Reset circuit + UI state whenever the question changes
+  // ── Reset circuit + UI state whenever the question changes ──────────────────
   useEffect(() => {
     setCircuitState(initCircuit(question));
     setFeedback(null);
     setAnswerRevealed(false);
   }, [questionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-expand circuit state to always have empty buffer slots at the end
+  // ── Auto-expand circuit state to always have empty buffer slots at the end ──
   useEffect(() => {
     let highestOccupiedIndex = -1;
     circuitState.forEach(wire => {
@@ -280,8 +322,8 @@ export default function QuestionsPage() {
       }
     });
     const minLength = Math.max(...question.circuit.map(w => w.length));
-    const desiredLength = question.restrictToBlanks 
-      ? minLength 
+    const desiredLength = question.restrictToBlanks
+      ? minLength
       : Math.max(minLength + 3, highestOccupiedIndex + 4);
     const currentLength = circuitState[0].length;
 
@@ -292,7 +334,7 @@ export default function QuestionsPage() {
     }
   }, [circuitState, question]);
 
-  // DnD monitor: handle gate drops from palette onto blank slots
+  // ── DnD monitor ─────────────────────────────────────────────────────────────
   useEffect(() => {
     return monitorForElements({
       onDrop({ source, location }) {
@@ -302,55 +344,105 @@ export default function QuestionsPage() {
         const { wireIndex, stepIndex } = dest.data;
         setCircuitState(prev => {
           const cell = prev[wireIndex]?.[stepIndex];
-          if (cell?.blank && (cell.name === 'BLANK_2' || cell.name === 'BLANK_3')) {
+          if (source.data.type === 'gate' && cell?.blank && (cell.name === 'BLANK_2' || cell.name === 'BLANK_3')) {
             const is2Wire = TWO_WIRE.includes(source.data.name);
             const is3Wire = source.data.name === 'TOFFOLI';
             if ((cell.name === 'BLANK_2' && is2Wire) || (cell.name === 'BLANK_3' && is3Wire)) {
-              return prev.map(w => w.map((c, si) => 
-                (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: source.data.name } : c
-              ));
+              const involvedWires = [];
+              if (cell.name === 'BLANK_2') {
+                involvedWires.push(wireIndex);
+                involvedWires.push(cell.role === 'control' ? cell.targetWire : cell.controlWire);
+              } else if (cell.name === 'BLANK_3') {
+                involvedWires.push(cell.targetWire);
+                involvedWires.push(cell.controls[0]);
+                involvedWires.push(cell.controls[1]);
+              }
+              involvedWires.sort((a, b) => a - b);
+
+              return prev.map((w, wi) => w.map((c, si) => {
+                if (si === stepIndex && involvedWires.includes(wi) && c?.blank && c.name === cell.name) {
+                  if (is2Wire) {
+                    const top = involvedWires[0];
+                    const bottom = involvedWires[1];
+                    if (wi === top) {
+                      return { ...c, filled: source.data.name, role: 'control', targetWire: bottom, controlWire: undefined };
+                    } else {
+                      return { ...c, filled: source.data.name, role: 'target', controlWire: top, targetWire: undefined };
+                    }
+                  } else if (is3Wire) {
+                    const target = involvedWires[2];
+                    const controls = [involvedWires[0], involvedWires[1]];
+                    if (wi === target) {
+                      return { ...c, filled: source.data.name, role: 'target', controls, targetWire: target };
+                    } else {
+                      return { ...c, filled: source.data.name, role: 'control', controls, targetWire: target };
+                    }
+                  }
+                }
+                return c;
+              }));
             }
             return prev;
           }
-          return applyGateDrop(prev, source.data, dest.data, {
+
+          if (question.restrictToBlanks) {
+            const isCnotSwap = source.data.type === 'cnot-node' && dest.data.type === 'cnot-node-drop' && source.data.peerWire === dest.data.wireIndex && source.data.stepIndex === dest.data.stepIndex;
+            const isToffoliSwap = source.data.type === 'toffoli-node' && dest.data.type === 'cnot-node-drop' && dest.data.stepIndex === source.data.stepIndex && (source.data.controls?.includes(dest.data.wireIndex) || source.data.targetWire === dest.data.wireIndex);
+            
+            if (dest.data.type === 'gate-insert' || (dest.data.type === 'cnot-node-drop' && !isCnotSwap && !isToffoliSwap)) {
+              return prev;
+            }
+          }
+          const next = applyGateDrop(prev, source.data, dest.data, {
             hiddenBlocks: question.hiddenBlocks,
           });
+          // For free-form (equivalent circuit) mode, left-align after every drop
+          return question.restrictToBlanks ? next : compactCircuit(next);
         });
         setFeedback(null);
       },
     });
   }, [question]);
 
+  // ── Delete gate ─────────────────────────────────────────────────────────────
   const deleteGate = useCallback((wireIndex, stepIndex) => {
     setCircuitState(prev => {
       const cell = prev[wireIndex]?.[stepIndex];
+      // Clear filled multi-qubit blank
       if (cell?.blank && (cell.name === 'BLANK_2' || cell.name === 'BLANK_3')) {
-        return prev.map(w => w.map((c, si) => 
+        return prev.map(w => w.map((c, si) =>
           (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: undefined } : c
         ));
       }
-      return removeGateFromCircuit(prev, wireIndex, stepIndex);
+      // removeGateFromCircuit already guards cell.locked — locked question gates are never removed
+      const next = removeGateFromCircuit(prev, wireIndex, stepIndex);
+      // Left-align after delete in free-form mode
+      return question.restrictToBlanks ? next : compactCircuit(next);
     });
     setFeedback(null);
-  }, []);
+  }, [question]);
 
+  // ── Check answer ─────────────────────────────────────────────────────────────
   const checkCorrect = useCallback(() => {
     if (!question.restrictToBlanks) {
       if (!simResults || simResults.stateVector.length === 0 || !engine) return false;
 
-      // Build the teacher's expected circuit
       const expectedGrid = question.circuit.map(wire => wire.map(cell => {
         if (!cell || cell.blank) return null;
         return { ...cell };
       }));
 
       if (question.answer) {
+        // Answer step indices from the builder are 0-based (relative to answerCircuit).
+        // Offset them past the question circuit so they don't overwrite locked gates.
+        const qLen = question.circuit[0].length;
         question.answer.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
-          while (expectedGrid[0].length <= stepIndex) expectedGrid.forEach(w => w.push(null));
+          const absStep = stepIndex + qLen;
+          while (expectedGrid[0].length <= absStep) expectedGrid.forEach(w => w.push(null));
           if (role) {
-            expectedGrid[wireIndex][stepIndex] = { name: gate, role, targetWire, controlWire, controls };
+            expectedGrid[wireIndex][absStep] = { name: gate, role, targetWire, controlWire, controls };
           } else {
-            expectedGrid[wireIndex][stepIndex] = { name: gate };
+            expectedGrid[wireIndex][absStep] = { name: gate };
           }
         });
       }
@@ -358,7 +450,6 @@ export default function QuestionsPage() {
       const expectedSim = simulateCircuit(engine, expectedGrid, null, shots, null);
       if (!expectedSim || expectedSim.stateVector.length === 0) return false;
 
-      // Compute fidelity |<psi|phi>|^2
       let realPart = 0, imagPart = 0;
       for (let i = 0; i < simResults.stateVector.length; i++) {
         realPart += simResults.stateVector[i].real * expectedSim.stateVector[i].real + simResults.stateVector[i].imag * expectedSim.stateVector[i].imag;
@@ -367,44 +458,56 @@ export default function QuestionsPage() {
       return (realPart * realPart + imagPart * imagPart) > 0.99;
     }
 
-    // Strict match for blanks:
-    // Ensure every blank in the student's circuit matches the expected answer (filled or intentionally left empty)
     for (let w = 0; w < circuitState.length; w++) {
       for (let s = 0; s < circuitState[w].length; s++) {
         const cell = circuitState[w][s];
         if (cell?.blank) {
+              const originalCell = question.circuit[w]?.[s];
+              if (!originalCell) return false;
+
           if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') {
+                if (cell.role !== originalCell.role) return false;
+                if (cell.targetWire !== originalCell.targetWire) return false;
+                if (cell.controlWire !== originalCell.controlWire) return false;
+                
+                if (cell.controls || originalCell.controls) {
+                  if (!cell.controls || !originalCell.controls) return false;
+                  const c1 = [...cell.controls].sort((a, b) => a - b);
+                  const c2 = [...originalCell.controls].sort((a, b) => a - b);
+                  if (c1[0] !== c2[0] || c1[1] !== c2[1]) return false;
+                }
+
+            // Only check once per multi-qubit blank (at the control wire)
             if (cell.role !== 'control') continue;
             if (cell.name === 'BLANK_3' && cell.controls && cell.controls[0] !== w) continue;
           }
-          const expected = (question.answer || []).find(a => a.wireIndex === w && a.stepIndex === s);
-          if (expected) {
-            if (cell.filled !== expected.gate) return false;
-          } else {
-            if (cell.filled) return false;
-          }
+
+              const expected = (question.answer || []).find(a => a.wireIndex === w && a.stepIndex === s);
+              if (expected) {
+                if (cell.filled !== expected.gate) return false;
+              } else {
+                if (cell.filled) return false;
+              }
         }
       }
     }
     return true;
   }, [circuitState, question, simResults, engine, shots]);
 
+  // ── Advance to next question ─────────────────────────────────────────────────
   const advanceQuestion = useCallback((pointsEarned) => {
-    const record = { questionId: question.id, points: pointsEarned, usedHint: answerRevealed };
-    const newScores = [...scores, record];
+    const record     = { questionId: question.id, points: pointsEarned, usedHint: answerRevealed };
+    const newScores  = [...scores, record];
     setScores(newScores);
-    if (questionIndex + 1 < QUESTIONS.length) {
+    if (questionIndex + 1 < activeQuestions.length) {
       setQuestionIndex(qi => qi + 1);
     } else {
       setPhase('done');
     }
-  }, [scores, question, questionIndex, answerRevealed]);
+  }, [scores, question, questionIndex, answerRevealed, activeQuestions]);
 
   const handleSubmit = () => {
-    if (answerRevealed) {
-      advanceQuestion(0);
-      return;
-    }
+    if (answerRevealed) { advanceQuestion(0); return; }
     if (checkCorrect()) {
       setFeedback('correct');
       setTimeout(() => advanceQuestion(question.points), 1400);
@@ -415,8 +518,33 @@ export default function QuestionsPage() {
 
   const handleGetAnswer = () => {
     setCircuitState(prev => {
-      // Clear any student-filled blanks first
-      let next = prev.map(w => w.map(c => c?.blank ? { ...c, filled: undefined } : c));
+      if (!question.restrictToBlanks) {
+        // Equivalent-circuit mode: clear student gates, then place answer gates
+        // with the same offset used in checkCorrect so they land after the given circuit.
+        let next = prev.map(w => w.map(c => (c && !c.locked) ? null : c));
+        if (question.answer) {
+          const qLen = question.circuit[0].length;
+          question.answer.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
+            const absStep = stepIndex + qLen;
+            while (next[0].length <= absStep) next.forEach(w => w.push(null));
+            if (role) {
+              next[wireIndex][absStep] = { name: gate, role, targetWire, controlWire, controls };
+            } else {
+              next[wireIndex][absStep] = { name: gate };
+            }
+          });
+        }
+        return next;
+      }
+
+      // restrictToBlanks mode: reset blank fills, then fill each blank with its answer gate.
+      let next = prev.map((w, wi) => w.map((c, si) => {
+        if (c?.blank) {
+          const orig = question.circuit[wi]?.[si];
+          if (orig) return { ...orig, filled: undefined };
+        }
+        return c;
+      }));
       if (question.answer) {
         question.answer.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
           while (next[0].length <= stepIndex) next.forEach(w => w.push(null));
@@ -426,14 +554,12 @@ export default function QuestionsPage() {
             const cell = next[wireIndex][stepIndex];
             if (cell?.blank) {
               if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') {
-                 next = next.map(w => w.map((c, si) => 
-                   (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: gate } : c
-                 ));
+                next = next.map(w => w.map((c, si) =>
+                  (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: gate } : c
+                ));
               } else {
-                 next[wireIndex][stepIndex] = { ...cell, filled: gate };
+                next[wireIndex][stepIndex] = { ...cell, filled: gate };
               }
-            } else {
-              next[wireIndex][stepIndex] = { name: gate };
             }
           }
         });
@@ -444,51 +570,64 @@ export default function QuestionsPage() {
     setFeedback(null);
   };
 
-  const handleRetry = () => {
-    setScores([]);
-    setQuestionIndex(0);
-    setPhase('playing');
-  };
+  const handleRetry = () => startQuiz(activeQuestions);
 
-  // ── Final screen ──────────────────────────────────────────────────────────
+  // ── Final screen ──────────────────────────────────────────────────────────────
   if (phase === 'done') {
-    return <FinalScreen scores={scores} onRetry={handleRetry} />;
+    return <FinalScreen scores={scores} questions={activeQuestions} onRetry={handleRetry} />;
   }
 
-  // ── Header totals ─────────────────────────────────────────────────────────
-  const maxPoints = QUESTIONS.reduce((s, q) => s + q.points, 0);
+  const maxPoints    = activeQuestions.reduce((s, q) => s + q.points, 0);
   const currentScore = scores.reduce((s, r) => s + r.points, 0);
+
+  // For equivalent-circuit questions: show a separator after the given circuit
+  const separatorStep = !question.restrictToBlanks ? question.circuit[0].length : undefined;
 
   return (
     <div className="fixed inset-0 flex flex-col font-sans text-slate-300 bg-slate-950">
 
-      {/* ── Top bar ───────────────────────────────────────────────────────── */}
+      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <header className="bg-slate-900 border-b border-slate-700/50 flex items-center gap-4 px-5 py-3 shrink-0">
-        <Link
-          to="/"
-          className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0"
-        >
+        <Link to="/" className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0">
           ← Visualizer
         </Link>
 
         <span className="text-slate-700 select-none">|</span>
 
+        {/* Title: quiz name when loaded, otherwise "Practice Questions" */}
         <h1 className="text-sm font-semibold text-white tracking-tight">
-          Practice Questions
+          {quizTitle ?? 'Practice Questions'}
         </h1>
 
-        <Link
-          to="/builder"
-          className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0"
-        >
+        {/* Back to practice (only when a quiz file is loaded) */}
+        {quizTitle && (
+          <button
+            onClick={() => { setQuizTitle(null); startQuiz(QUESTIONS); }}
+            className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0"
+          >
+            ← Practice
+          </button>
+        )}
+
+        <Link to="/builder" className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0">
           Question Builder →
         </Link>
+
+        {/* Load quiz file */}
+        <input ref={quizFileRef} type="file" accept=".qpkg" onChange={handleLoadQuizFile} className="hidden" />
+        <button
+          onClick={() => quizFileRef.current?.click()}
+          className="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors shrink-0"
+          title="Load a .qpkg quiz file from your teacher"
+        >
+          ↑ Load Quiz File
+        </button>
 
         <div className="flex-1" />
 
         {/* Progress dots */}
         <div className="flex gap-2 items-center">
-          {QUESTIONS.map((q, i) => (
+          {activeQuestions.map((q, i) => (
             <div
               key={q.id}
               className={`w-2.5 h-2.5 rounded-full border-2 transition-all ${
@@ -505,23 +644,22 @@ export default function QuestionsPage() {
 
         <span className="text-slate-700 select-none">|</span>
 
-        {/* Running score */}
         <span className="text-[11px] text-slate-400 font-mono tabular-nums shrink-0">
           <span className="text-white font-semibold">{currentScore}</span>
           <span className="text-slate-600"> / {maxPoints} pts</span>
         </span>
       </header>
 
-      {/* ── Body ─────────────────────────────────────────────────────────── */}
+      {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* Left: gate palette */}
         <aside className="w-44 bg-slate-900 border-r border-slate-700/50 flex flex-col shrink-0">
           <div className="px-4 py-3 border-b border-slate-700/50">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-              Gate Palette
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Gate Palette</p>
+            <p className="text-[10px] text-slate-600 mt-0.5">
+              {question.restrictToBlanks ? 'Drag onto a blank' : 'Drag onto circuit'}
             </p>
-            <p className="text-[10px] text-slate-600 mt-0.5">Drag onto a blank</p>
           </div>
           <div className="p-4 overflow-y-auto">
             <div className="grid grid-cols-2 gap-3 items-center justify-items-center">
@@ -538,24 +676,33 @@ export default function QuestionsPage() {
           {/* Question header */}
           <div>
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1">
-              Question {questionIndex + 1} of {QUESTIONS.length}
+              Question {questionIndex + 1} of {activeQuestions.length}
               <span className="text-slate-600"> · {question.points} points</span>
             </p>
             <h2 className="text-xl font-bold text-white mb-2">{question.title}</h2>
-            <p className="text-sm text-slate-400 max-w-lg leading-relaxed">
-              {question.description}
-            </p>
+            <p className="text-sm text-slate-400 max-w-lg leading-relaxed">{question.description}</p>
+            {/* Label for equivalent-circuit questions */}
+            {!question.restrictToBlanks && separatorStep != null && (
+              <p className="text-[10px] text-slate-600 mt-1">
+                The blue line separates the given circuit (left) from your additions (right). Both count for amplitude.
+              </p>
+            )}
           </div>
 
           {/* Circuit board */}
           <div className="overflow-auto">
-            <QuestionCircuit circuitState={circuitState} hiddenBlocks={question.hiddenBlocks} restrictToBlanks={question.restrictToBlanks} onDelete={deleteGate} />
+            <QuestionCircuit
+              circuitState={circuitState}
+              hiddenBlocks={question.hiddenBlocks}
+              restrictToBlanks={question.restrictToBlanks}
+              onDelete={deleteGate}
+              separatorStep={separatorStep}
+            />
           </div>
 
           {/* Controls + feedback */}
           <div className="flex items-center gap-3 flex-wrap">
             {answerRevealed ? (
-              /* After "Get Answer" — offer Next/Finish, no points */
               <>
                 <div className="text-sm text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-1.5">
                   Answer revealed — 0 points for this question
@@ -564,11 +711,10 @@ export default function QuestionsPage() {
                   onClick={() => advanceQuestion(0)}
                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-lg transition-colors"
                 >
-                  {questionIndex + 1 < QUESTIONS.length ? 'Next Question →' : 'Finish →'}
+                  {questionIndex + 1 < activeQuestions.length ? 'Next Question →' : 'Finish →'}
                 </button>
               </>
             ) : (
-              /* Normal play state */
               <>
                 <button
                   onClick={handleSubmit}
@@ -611,7 +757,7 @@ export default function QuestionsPage() {
           onResample={() => {
             const normalizedCircuit = circuitState.map(w => w.map(c => {
               if (!c) return null;
-              if (c.blank) return c.filled ? { name: c.filled } : null;
+              if (c.blank) return c.filled ? { ...c, name: c.filled } : null;
               return { ...c };
             }));
             setSimResults(simulateCircuit(engine, normalizedCircuit, null, shots, null));

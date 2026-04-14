@@ -40,11 +40,14 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
     destData.stepIndex === sourceData.stepIndex;
 
   if (isToffoliSwap) {
+    const _tOld  = next[sourceData.wireIndex]?.[sourceData.stepIndex];
+    const _tSwap = next[destData.wireIndex]?.[sourceData.stepIndex];
+
     const oldWire = sourceData.wireIndex;
     const swapWire = destData.wireIndex;
     const step = sourceData.stepIndex;
-    const oldRole = next[oldWire][step].role;
-    const swapRole = next[swapWire][step].role;
+    const oldRole = _tOld.role;
+    const swapRole = _tSwap.role;
     if (oldRole === swapRole) return prevCircuit;
 
     const controls = [...sourceData.controls];
@@ -53,21 +56,41 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
     else newControls = [oldWire, controls.find(c => c !== swapWire)];
     const newTarget = oldRole === 'control' ? oldWire : swapWire;
 
-    next[oldWire][step].role = swapRole;
-    next[swapWire][step].role = oldRole;
-    next[newControls[0]][step].controls = newControls;
-    next[newControls[0]][step].targetWire = newTarget;
-    next[newControls[1]][step].controls = newControls;
-    next[newControls[1]][step].targetWire = newTarget;
-    next[newTarget][step].controls = newControls;
-    next[newTarget][step].targetWire = newTarget;
+    // Immutable updates to preserve blank structure
+    next[oldWire][step]       = { ...next[oldWire][step],       role: swapRole, controls: newControls, targetWire: newTarget };
+    next[swapWire][step]      = { ...next[swapWire][step],      role: oldRole,  controls: newControls, targetWire: newTarget };
+    next[newControls[0]][step] = { ...next[newControls[0]][step], controls: newControls, targetWire: newTarget };
+    next[newControls[1]][step] = { ...next[newControls[1]][step], controls: newControls, targetWire: newTarget };
+    next[newTarget][step]     = { ...next[newTarget][step],     controls: newControls, targetWire: newTarget };
     return next;
   }
 
   if (isCnotSwap) {
+    const _cOld  = next[sourceData.wireIndex]?.[sourceData.stepIndex];
+    const _cPeer = next[sourceData.peerWire]?.[sourceData.stepIndex];
+
     const oldWire = sourceData.wireIndex;
     const peerWire = sourceData.peerWire;
     const step = sourceData.stepIndex;
+
+    if (_cOld?.blank && _cPeer?.blank) {
+      // Swap roles within blank structure (immutable, preserves blank:true etc.)
+      const { controlWire: _oCW, targetWire: _oTW, ...oldBase } = _cOld;
+      const { controlWire: _pCW, targetWire: _pTW, ...peerBase } = _cPeer;
+      const newOldRole = _cPeer.role;
+      const newPeerRole = _cOld.role;
+      next[oldWire][step] = {
+        ...oldBase,
+        role: newOldRole,
+        ...(newOldRole === 'control' ? { targetWire: peerWire } : { controlWire: peerWire }),
+      };
+      next[peerWire][step] = {
+        ...peerBase,
+        role: newPeerRole,
+        ...(newPeerRole === 'control' ? { targetWire: oldWire } : { controlWire: oldWire }),
+      };
+      return next;
+    }
 
     next[oldWire][step] = {
       name: sourceData.name,
@@ -112,8 +135,10 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
       if (TWO_WIRE.includes(gateName)) {
         const tIdx = targetWire < next.length - 1 ? targetWire + 1 : targetWire - 1;
         if (tIdx >= 0 && tIdx < next.length) {
-          next[targetWire][insertStep] = { name: gateName, role: 'control', targetWire: tIdx };
-          next[tIdx][insertStep] = { name: gateName, role: 'target', controlWire: targetWire };
+          const ctrlW = Math.min(targetWire, tIdx);
+          const tgtW  = Math.max(targetWire, tIdx);
+          next[ctrlW][insertStep] = { name: gateName, role: 'control', targetWire: tgtW };
+          next[tgtW][insertStep]  = { name: gateName, role: 'target',  controlWire: ctrlW };
         }
       } else if (gateName === 'TOFFOLI') {
         const c1 = targetWire;
@@ -155,8 +180,10 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
       if (TWO_WIRE.includes(gateName)) {
         const tIdx = wIdx < next.length - 1 ? wIdx + 1 : wIdx - 1;
         if (tIdx >= 0 && tIdx < next.length && !isOccupied(wIdx, sIdx) && !isOccupied(tIdx, sIdx)) {
-          next[wIdx][sIdx] = { name: gateName, role: 'control', targetWire: tIdx };
-          next[tIdx][sIdx] = { name: gateName, role: 'target', controlWire: wIdx };
+          const ctrlW = Math.min(wIdx, tIdx);
+          const tgtW  = Math.max(wIdx, tIdx);
+          next[ctrlW][sIdx] = { name: gateName, role: 'control', targetWire: tgtW };
+          next[tgtW][sIdx]  = { name: gateName, role: 'target',  controlWire: ctrlW };
           return next;
         }
       } else if (gateName === 'TOFFOLI') {
