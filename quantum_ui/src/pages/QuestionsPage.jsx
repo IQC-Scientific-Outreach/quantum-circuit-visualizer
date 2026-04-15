@@ -800,9 +800,9 @@ export default function QuestionsPage() {
               <ReactMarkdown
                 remarkPlugins={[remarkMath]}
                 rehypePlugins={[rehypeKatex]}
-                components={{ p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} /> }}
+                components={{ p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} /> }}
               >
-                {question.description}
+                {(question.description || '').replace(/\n{3,}/g, match => '\n\n' + '&nbsp;\n\n'.repeat(match.length - 2))}
               </ReactMarkdown>
             </div>
             {/* Label for equivalent-circuit questions */}

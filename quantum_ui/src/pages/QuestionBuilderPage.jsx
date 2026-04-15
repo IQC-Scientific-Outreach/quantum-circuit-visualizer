@@ -643,9 +643,9 @@ function QuestionEditor({ question: q, onChange }) {
               <ReactMarkdown
                 remarkPlugins={[remarkMath]}
                 rehypePlugins={[rehypeKatex]}
-                components={{ p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} /> }}
+                components={{ p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} /> }}
               >
-                {q.description}
+                {(q.description || '').replace(/\n{3,}/g, match => '\n\n' + '&nbsp;\n\n'.repeat(match.length - 2))}
               </ReactMarkdown>
             </div>
           )}
