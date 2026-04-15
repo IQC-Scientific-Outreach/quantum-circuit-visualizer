@@ -38,11 +38,14 @@ function makeGrid(nWires, nSteps) {
   return Array.from({ length: nWires }, () => Array(nSteps).fill(null));
 }
 
-let _nextId = 1;
+function generateId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+}
+
 function newQuestion() {
-  const id = _nextId++;
   return {
-    id,
+    id: generateId(),
     title: '', description: '', points: 10,
     restrictToBlanks: true,
     allowedGates: ['H', 'X', 'Y', 'Z'],
@@ -72,76 +75,6 @@ function serializeCell(cell) {
     return { blank: true, name: 'BLANK' };
   }
   return { ...cell, locked: true };
-}
-
-function compactGridData(grid, exactAnswer = null, hiddenBlocks = null) {
-  const nWires = grid.length;
-  if (nWires === 0) return { newGrid: grid, newExactAnswer: exactAnswer, newHiddenBlocks: hiddenBlocks };
-  const nSteps = grid[0].length;
-
-  const colsToKeep = [];
-  for (let s = 0; s < nSteps; s++) {
-    let isEmpty = true;
-    for (let w = 0; w < nWires; w++) {
-      if (grid[w][s] !== null) {
-        isEmpty = false;
-        break;
-      }
-    }
-    if (!isEmpty) colsToKeep.push(s);
-  }
-
-  const newGrid = Array.from({ length: nWires }, () => []);
-  const oldToNewStep = {};
-
-  for (let newS = 0; newS < colsToKeep.length; newS++) {
-    const oldS = colsToKeep[newS];
-    oldToNewStep[oldS] = newS;
-    for (let w = 0; w < nWires; w++) {
-      newGrid[w].push(grid[w][oldS]);
-    }
-  }
-
-  let newExactAnswer = exactAnswer;
-  if (exactAnswer) {
-    newExactAnswer = {};
-    for (const [key, gate] of Object.entries(exactAnswer)) {
-      const [wStr, sStr] = key.split('_');
-      const w = Number(wStr);
-      const s = Number(sStr);
-      if (oldToNewStep[s] !== undefined) {
-        if (newGrid[w][oldToNewStep[s]]?.blank) {
-          newExactAnswer[`${w}_${oldToNewStep[s]}`] = gate;
-        }
-      }
-    }
-  }
-
-  let newHiddenBlocks = hiddenBlocks;
-  if (hiddenBlocks && hiddenBlocks.length > 0) {
-    newHiddenBlocks = hiddenBlocks.map(block => {
-      let newStart = newGrid[0].length;
-      for (let s = block.startStep; s < nSteps; s++) {
-        if (oldToNewStep[s] !== undefined) {
-          newStart = oldToNewStep[s];
-          break;
-        }
-      }
-      let newEnd = -1;
-      for (let s = block.endStep; s >= 0; s--) {
-        if (oldToNewStep[s] !== undefined) {
-          newEnd = oldToNewStep[s];
-          break;
-        }
-      }
-      if (newStart > newEnd) {
-        newStart = newEnd = Math.max(0, newEnd);
-      }
-      return { ...block, startStep: newStart, endStep: newEnd };
-    });
-  }
-
-  return { newGrid, newExactAnswer, newHiddenBlocks };
 }
 
 function serializeAnswerCircuit(circuit) {
@@ -520,9 +453,15 @@ function QuestionEditor({ question: q, onChange }) {
     const newCircuitRaw = typeof updater === 'function' ? updater(prevGrid) : updater;
     if (newCircuitRaw === prevGrid) return;
     
-    const { newGrid, newExactAnswer, newHiddenBlocks } = compactGridData(newCircuitRaw, q.exactAnswer, q.hiddenBlocks);
+    const newExactAnswer = {};
+    for (const [key, gate] of Object.entries(q.exactAnswer)) {
+      const [w, s] = key.split('_').map(Number);
+      if (newCircuitRaw[w]?.[s]?.blank) {
+        newExactAnswer[key] = gate;
+      }
+    }
     
-    update({ circuit: newGrid, nSteps: newGrid[0].length, exactAnswer: newExactAnswer, hiddenBlocks: newHiddenBlocks });
+    update({ circuit: newCircuitRaw, nSteps: newCircuitRaw[0].length, exactAnswer: newExactAnswer });
   }
 
   function handleAnswerChange(updater) {
@@ -530,8 +469,7 @@ function QuestionEditor({ question: q, onChange }) {
     const newCircuitRaw = typeof updater === 'function' ? updater(prevGrid) : updater;
     if (newCircuitRaw === prevGrid) return;
     
-    const { newGrid } = compactGridData(newCircuitRaw);
-    update({ answerCircuit: newGrid, answerNSteps: newGrid[0].length });
+    update({ answerCircuit: newCircuitRaw, answerNSteps: newCircuitRaw[0].length });
   }
 
   // ── Wire / step resize ────────────────────────────────────────────────────
@@ -894,10 +832,9 @@ export default function QuestionBuilderPage() {
                 exactAnswer[`${ans.wireIndex}_${ans.stepIndex}`] = ans.gate;
               });
             }
-            return { ...q, answerNQubits: q.nQubits || 1, answerCircuit: ac.slice(0, q.nQubits || 1), exactAnswer };
+            return { ...q, id: q.id ?? generateId(), answerNQubits: q.nQubits || 1, answerCircuit: ac.slice(0, q.nQubits || 1), exactAnswer };
           });
           setQuestions(syncedData); setSelectedId(syncedData[0].id);
-          _nextId = Math.max(...data.map(q => q.id ?? 0)) + 1;
         } else { alert('File does not contain a valid question list.'); }
       } catch { alert('Could not parse the file — make sure it is a valid JSON backup.'); }
     };
