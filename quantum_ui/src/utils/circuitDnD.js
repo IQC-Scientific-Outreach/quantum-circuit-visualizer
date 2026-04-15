@@ -295,48 +295,52 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
  *  - Wire indices above the removed wire are decremented by 1.
  */
 export function removeWireFromGrid(circuit, wireIndex) {
-  const cleaned = circuit.map((wire, wi) => {
-    if (wi === wireIndex) return wire; // filtered out below
-    return wire.map(cell => {
-      if (!cell) return cell;
-      if (TWO_WIRE.includes(cell.name)) {
-        const peerKey = cell.role === 'control' ? 'targetWire' : 'controlWire';
-        const peer = cell[peerKey];
-        if (peer === wireIndex) return null;
-        return peer > wireIndex ? { ...cell, [peerKey]: peer - 1 } : cell;
-      } else if (cell.name === 'TOFFOLI') {
-        if (cell.controls.includes(wireIndex) || cell.targetWire === wireIndex) return null;
-        return {
-          ...cell,
-          controls: cell.controls.map(c => c > wireIndex ? c - 1 : c),
-          targetWire: cell.targetWire > wireIndex ? cell.targetWire - 1 : cell.targetWire,
-        };
-      } else if (cell.name === 'BARRIER') {
-        const newTop    = cell.topWire    > wireIndex ? cell.topWire    - 1 : cell.topWire;
-        const newBottom = cell.bottomWire > wireIndex ? cell.bottomWire - 1 : cell.bottomWire;
-        if (newTop > newBottom) return null;
-        return { ...cell, topWire: newTop, bottomWire: newBottom };
-      } else if (cell.blank && cell.name === 'BLANK_2') {
-        const peerKey = cell.role === 'control' ? 'targetWire' : 'controlWire';
-        const peer = cell[peerKey];
-        if (peer === wireIndex) return null;
-        return peer > wireIndex ? { ...cell, [peerKey]: peer - 1 } : cell;
-      } else if (cell.blank && cell.name === 'BLANK_3') {
-        if (cell.controls.includes(wireIndex) || cell.targetWire === wireIndex) return null;
-        return {
-          ...cell,
-          controls: cell.controls.map(c => c > wireIndex ? c - 1 : c),
-          targetWire: cell.targetWire > wireIndex ? cell.targetWire - 1 : cell.targetWire,
-        };
-      }
-      return cell;
-    });
-  });
-  return cleaned.filter((_, i) => i !== wireIndex);
+  // Step 1: For every occupied cell on the removed wire, use the same delete
+  // logic as the × button — this nulls out partner cells on surviving wires.
+  let cleaned = circuit.map(w => [...w]);
+  const nSteps = cleaned[0]?.length ?? 0;
+  for (let s = 0; s < nSteps; s++) {
+    if (cleaned[wireIndex]?.[s]) {
+      cleaned = removeGateFromCircuit(cleaned, wireIndex, s);
+    }
+  }
+
+  // Step 2: Drop the wire row.
+  cleaned = cleaned.filter((_, i) => i !== wireIndex);
+
+  // Step 3: Remap partner-wire indices in any surviving multi-qubit cells
+  // whose peers were above the removed wire (indices shift down by 1).
+  return cleaned.map(wire => wire.map(cell => {
+    if (!cell) return cell;
+    if (TWO_WIRE.includes(cell.name) || (cell.blank && cell.name === 'BLANK_2')) {
+      const pk = cell.role === 'control' ? 'targetWire' : 'controlWire';
+      const peer = cell[pk];
+      return peer > wireIndex ? { ...cell, [pk]: peer - 1 } : cell;
+    }
+    if (cell.name === 'TOFFOLI' || (cell.blank && cell.name === 'BLANK_3')) {
+      return {
+        ...cell,
+        controls: cell.controls.map(c => c > wireIndex ? c - 1 : c),
+        targetWire: cell.targetWire > wireIndex ? cell.targetWire - 1 : cell.targetWire,
+      };
+    }
+    if (cell.name === 'BARRIER') {
+      const newTop    = cell.topWire    > wireIndex ? cell.topWire    - 1 : cell.topWire;
+      const newBottom = cell.bottomWire > wireIndex ? cell.bottomWire - 1 : cell.bottomWire;
+      return newTop > newBottom ? null : { ...cell, topWire: newTop, bottomWire: newBottom };
+    }
+    return cell;
+  }));
 }
 
 /**
- * Safely removes a gate from a circuit grid, handling multi-qubit bounds and blanks.
+ * Safely removes a gate from a circuit grid, handling multi-qubit bounds.
+ * Blanks are treated identically to their gate equivalents:
+ *   BLANK_2 → same as CNOT/CZ (null both cells)
+ *   BLANK_3 → same as TOFFOLI  (null all three cells)
+ *   BLANK   → null the single cell
+ * NOTE: QuestionsPage.deleteGate intercepts blanks *before* calling this in
+ * order to preserve the "clear fill only" quiz behaviour.
  */
 export function removeGateFromCircuit(circuit, wireIndex, stepIndex) {
   const next = circuit.map(w => [...w]);
@@ -344,8 +348,16 @@ export function removeGateFromCircuit(circuit, wireIndex, stepIndex) {
   if (!cell || cell.locked) return next;
 
   if (cell.blank) {
-    if (cell.filled) {
-      next[wireIndex][stepIndex] = { blank: true };
+    if (cell.name === 'BLANK_2') {
+      const peerWire = cell.role === 'control' ? cell.targetWire : cell.controlWire;
+      next[wireIndex][stepIndex] = null;
+      if (next[peerWire]) next[peerWire][stepIndex] = null;
+    } else if (cell.name === 'BLANK_3') {
+      next[cell.controls[0]][stepIndex] = null;
+      next[cell.controls[1]][stepIndex] = null;
+      next[cell.targetWire][stepIndex] = null;
+    } else {
+      next[wireIndex][stepIndex] = null;
     }
     return next;
   }

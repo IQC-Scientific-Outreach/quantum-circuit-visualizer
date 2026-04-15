@@ -462,13 +462,21 @@ export default function QuestionsPage() {
   const deleteGate = useCallback((wireIndex, stepIndex) => {
     setCircuitState(prev => {
       const cell = prev[wireIndex]?.[stepIndex];
-      // Clear filled multi-qubit blank
-      if (cell?.blank && (cell.name === 'BLANK_2' || cell.name === 'BLANK_3')) {
-        return prev.map(w => w.map((c, si) =>
-          (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: undefined } : c
+      // Blanks: clear the filled gate but preserve the blank structure so the
+      // student can fill it again.  removeGateFromCircuit now fully deletes
+      // blanks (matching builder behaviour), so we intercept here first.
+      if (cell?.blank) {
+        if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') {
+          return prev.map(w => w.map((c, si) =>
+            (si === stepIndex && c?.blank && c.name === cell.name) ? { ...c, filled: undefined } : c
+          ));
+        }
+        // single BLANK: clear fill only
+        return prev.map((w, wi) => w.map((c, si) =>
+          (wi === wireIndex && si === stepIndex && c?.blank) ? { ...c, filled: undefined } : c
         ));
       }
-      // removeGateFromCircuit already guards cell.locked — locked question gates are never removed
+      // removeGateFromCircuit guards cell.locked — locked question gates are never removed
       const next = removeGateFromCircuit(prev, wireIndex, stepIndex);
       // Left-align after delete in free-form mode
       return question.restrictToBlanks ? next : compactCircuit(next);

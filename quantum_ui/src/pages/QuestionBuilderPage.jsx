@@ -340,36 +340,7 @@ function BuilderCircuitGrid({
 }) {
   function removeCell(w, s) {
     if (readOnly) return;
-    onCellsChange(prev => {
-      const cell = prev[w]?.[s];
-      if (!cell) return prev;
-      
-      if (cell.blank) {
-        const next = prev.map(wire => [...wire]);
-        if (cell.name === 'BLANK_2') {
-          const peer = cell.role === 'control' ? cell.targetWire : cell.controlWire;
-          next[w][s] = null;
-          if (peer != null) next[peer][s] = null;
-        } else if (cell.name === 'BLANK_3') {
-          next[w][s] = null;
-          if (cell.role === 'control') {
-            const peerC = cell.controls?.find(c => c !== w);
-            if (peerC != null) next[peerC][s] = null;
-            if (cell.targetWire != null) next[cell.targetWire][s] = null;
-          } else {
-            if (cell.controls) {
-              next[cell.controls[0]][s] = null;
-              next[cell.controls[1]][s] = null;
-            }
-          }
-        } else {
-          next[w][s] = null;
-        }
-        return next;
-      }
-      
-      return removeGateFromCircuit(prev, w, s);
-    });
+    onCellsChange(prev => removeGateFromCircuit(prev, w, s));
   }
 
   useEffect(() => {
