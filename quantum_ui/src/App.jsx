@@ -8,7 +8,7 @@ import { SINGLE_QUBIT_GATES, MAX_QUBITS } from './constants';
 import { compactCircuit } from './utils/compactCircuit';
 import { simulateCircuit } from './utils/simulateCircuit';
 import { circuitToCode, parseCode } from './utils/circuitCode';
-import { removeGateFromCircuit } from './utils/circuitDnD';
+import { removeGateFromCircuit, removeWireFromGrid, TWO_WIRE, insertColumnIfOccupied, writeTwoWireGateCells, writeToffoliGateCells, findToffoliWires } from './utils/circuitDnD';
 import DraggableGate from './components/DraggableGate';
 import DraggableCnotNode from './components/DraggableCnotNode';
 import DraggablePlacedGate from './components/DraggablePlacedGate';
@@ -17,18 +17,6 @@ import CircuitCell from './components/CircuitCell';
 import DropZone from './components/DropZone';
 import ResultsPanel from './components/ResultsPanel';
 import './App.css'
-
-/**
- * Helper to safely make room in the circuit array before placing a gate/barrier.
- * If any of the target wires are already occupied at `stepIndex`, it splices
- * a clean column into the grid to push existing gates to the right.
- */
-const insertColumnIfOccupied = (circuitGrid, stepIndex, wiresToCheck) => {
-  const needsInsert = wiresToCheck.some(w => circuitGrid[w] && circuitGrid[w][stepIndex] !== null);
-  if (needsInsert) {
-    circuitGrid.forEach(wire => wire.splice(stepIndex, 0, null));
-  }
-};
 
 function App() {
   const [circuit, setCircuit] = useState([
@@ -49,8 +37,6 @@ function App() {
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState(null);
   const codeInputFocused = useRef(false);
-
-  const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
 
   // For each wire: the first step index that contains a MEASURE gate (-1 if none)
   const measureStepPerWire = circuit.map(wire => {
@@ -227,15 +213,11 @@ function App() {
             } else if (gateData.name === 'TOFFOLI') {
               c1 = slotData.wireIndex;
               if (prev.length < 3) return prev;
-              c2 = c1 + 1 < prev.length ? c1 + 1 : c1 - 1;
-              tIndex = [c1 + 2, c1 - 1, c1 - 2].find(w => w >= 0 && w < prev.length && w !== c2) ?? 
-                             [...Array(prev.length).keys()].find(w => w !== c1 && w !== c2);
-
-              const c1Measured = prev[c1]?.some(c => c?.name === 'MEASURE') ?? false;
-              const c2Measured = prev[c2]?.some(c => c?.name === 'MEASURE') ?? false;
-              const tgtMeasured  = prev[tIndex]?.some(c => c?.name === 'MEASURE') ?? false;
+              ({ c2, target: tIndex } = findToffoliWires(c1, prev.length));
+              const c1Measured  = prev[c1]?.some(c => c?.name === 'MEASURE') ?? false;
+              const c2Measured  = prev[c2]?.some(c => c?.name === 'MEASURE') ?? false;
+              const tgtMeasured = prev[tIndex]?.some(c => c?.name === 'MEASURE') ?? false;
               if (c1Measured || c2Measured || tgtMeasured) return prev;
-
               targetWires = [c1, c2, tIndex];
             } else {
               targetWires = [slotData.wireIndex];
@@ -245,12 +227,9 @@ function App() {
             insertColumnIfOccupied(newCircuit, step, targetWires);
 
             if (TWO_WIRE.includes(gateData.name)) {
-              newCircuit[cIndex][step] = { name: gateData.name, role: 'control', targetWire: tIndex };
-              newCircuit[tIndex][step] = { name: gateData.name, role: 'target', controlWire: cIndex };
+              writeTwoWireGateCells(newCircuit, cIndex, tIndex, step, gateData.name);
             } else if (gateData.name === 'TOFFOLI') {
-              newCircuit[c1][step] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
-              newCircuit[c2][step] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
-              newCircuit[tIndex][step] = { name: 'TOFFOLI', role: 'target', controls: [c1, c2], targetWire: tIndex };
+              writeToffoliGateCells(newCircuit, c1, c2, tIndex, step);
             } else {
               newCircuit[slotData.wireIndex][step] = { name: gateData.name };
             }
@@ -552,40 +531,7 @@ function App() {
 
   const removeQubit = (indexToRemove) => {
     if (circuit.length <= 1) return;
-    setCircuit(prev => {
-      // 1. For every remaining wire, null out cells whose 2-wire peer is the
-      //    deleted wire, and remap peer references for wires above the cut.
-      const cleaned = prev.map((wire, wi) => {
-        if (wi === indexToRemove) return wire; // will be filtered out below
-        return wire.map(cell => {
-          if (!cell) return cell;
-          if (TWO_WIRE.includes(cell.name)) {
-            const peerKey = cell.role === 'control' ? 'targetWire' : 'controlWire';
-            const peer = cell[peerKey];
-            if (peer === indexToRemove) return null; // orphaned — delete it
-            // Remap: if peer was above the removed wire, shift index down
-            return peer > indexToRemove
-              ? { ...cell, [peerKey]: peer - 1 }
-              : cell;
-          } else if (cell.name === 'TOFFOLI') {
-            if (cell.controls.includes(indexToRemove) || cell.targetWire === indexToRemove) return null;
-            return {
-              ...cell,
-              controls: cell.controls.map(c => c > indexToRemove ? c - 1 : c),
-              targetWire: cell.targetWire > indexToRemove ? cell.targetWire - 1 : cell.targetWire
-            };
-          } else if (cell.name === 'BARRIER') {
-            const newTop    = cell.topWire    > indexToRemove ? cell.topWire    - 1 : cell.topWire;
-            const newBottom = cell.bottomWire > indexToRemove ? cell.bottomWire - 1 : cell.bottomWire;
-            if (newTop > newBottom) return null;
-            return { ...cell, topWire: newTop, bottomWire: newBottom };
-          }
-          return cell;
-        });
-      });
-      // 2. Drop the deleted wire and compact the result.
-      return compactCircuit(cleaned.filter((_, i) => i !== indexToRemove));
-    });
+    setCircuit(prev => compactCircuit(removeWireFromGrid(prev, indexToRemove)));
   };
 
   // ---------------------------------------------------------------------------

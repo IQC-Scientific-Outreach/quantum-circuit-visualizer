@@ -1,9 +1,12 @@
 export const MAX_QUBITS = 10;
 
-export const SINGLE_QUBIT_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
-export const TWO_WIRE_GATES     = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
-export const AVAILABLE_GATES    = [...SINGLE_QUBIT_GATES, ...TWO_WIRE_GATES];
-export const BARRIER_GATE       = 'BARRIER';
+export const SINGLE_QUBIT_GATES   = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
+export const TWO_WIRE_GATES       = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
+export const THREE_WIRE_GATES     = ['TOFFOLI'];
+export const BARRIER_GATE         = 'BARRIER';
+export const AVAILABLE_GATES      = [...SINGLE_QUBIT_GATES, ...TWO_WIRE_GATES];
+/** All gates that span more than one wire (used to distinguish palette icon style). */
+export const MULTI_WIRE_GATES     = [...TWO_WIRE_GATES, ...THREE_WIRE_GATES, BARRIER_GATE];
 
 // Which gates carry a classical wire (control is a measured bit, not a qubit)
 export const CLASSICAL_CTRL_GATES = ['FF_x', 'FF_Z'];

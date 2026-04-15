@@ -1,6 +1,5 @@
 import { simulateShots } from './simulateShots';
-
-const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
+import { TWO_WIRE_GATES as TWO_WIRE } from '../constants';
 
 export function simulateCircuit(engine, circuit, targetStep = null, shots = 100, selectedQubit = null) {
   if (!engine) return null;

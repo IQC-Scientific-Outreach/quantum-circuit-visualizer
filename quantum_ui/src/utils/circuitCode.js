@@ -1,5 +1,4 @@
-const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
-const THREE_WIRE = ['TOFFOLI'];
+import { TWO_WIRE_GATES as TWO_WIRE, THREE_WIRE_GATES as THREE_WIRE } from '../constants';
 
 // Gate name → short code
 const GATE_TO_CODE = {

@@ -1,4 +1,48 @@
-export const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
+import { TWO_WIRE_GATES } from '../constants';
+
+// Re-export so callers that import TWO_WIRE from here don't break.
+export const TWO_WIRE = TWO_WIRE_GATES;
+
+// ─── Shared circuit-mutation helpers ─────────────────────────────────────────
+
+/**
+ * Splices a blank column at stepIndex if any of wiresToCheck are occupied there.
+ * "Occupied" means non-null and not a blank slot (blanks can be overwritten).
+ * Mutates circuitGrid in-place.
+ */
+export function insertColumnIfOccupied(circuitGrid, stepIndex, wiresToCheck) {
+  const needsInsert = wiresToCheck.some(
+    w => circuitGrid[w] && circuitGrid[w][stepIndex] !== null && !circuitGrid[w][stepIndex].blank
+  );
+  if (needsInsert) circuitGrid.forEach(wire => wire.splice(stepIndex, 0, null));
+}
+
+/** Writes both cells of a 2-wire gate. Mutates circuit in-place. */
+export function writeTwoWireGateCells(circuit, ctrlW, tgtW, step, gateName) {
+  circuit[ctrlW][step] = { name: gateName, role: 'control', targetWire: tgtW };
+  circuit[tgtW][step]  = { name: gateName, role: 'target',  controlWire: ctrlW };
+}
+
+/** Writes all three cells of a TOFFOLI gate. Mutates circuit in-place. */
+export function writeToffoliGateCells(circuit, c1, c2, target, step) {
+  circuit[c1][step]     = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: target };
+  circuit[c2][step]     = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: target };
+  circuit[target][step] = { name: 'TOFFOLI', role: 'target',  controls: [c1, c2], targetWire: target };
+}
+
+/**
+ * Picks default adjacent wires for a TOFFOLI given a primary (control) wire.
+ * Returns { c2, target } — the second control and the target wire index.
+ */
+export function findToffoliWires(primaryWire, numWires) {
+  const c2 = primaryWire + 1 < numWires ? primaryWire + 1 : primaryWire - 1;
+  const target =
+    [primaryWire + 2, primaryWire - 1, primaryWire - 2].find(w => w >= 0 && w < numWires && w !== c2) ??
+    [...Array(numWires).keys()].find(w => w !== primaryWire && w !== c2);
+  return { c2, target };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Centralized drag-and-drop logic for quantum circuits.
@@ -135,19 +179,12 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
       if (TWO_WIRE.includes(gateName)) {
         const tIdx = targetWire < next.length - 1 ? targetWire + 1 : targetWire - 1;
         if (tIdx >= 0 && tIdx < next.length) {
-          const ctrlW = Math.min(targetWire, tIdx);
-          const tgtW  = Math.max(targetWire, tIdx);
-          next[ctrlW][insertStep] = { name: gateName, role: 'control', targetWire: tgtW };
-          next[tgtW][insertStep]  = { name: gateName, role: 'target',  controlWire: ctrlW };
+          writeTwoWireGateCells(next, Math.min(targetWire, tIdx), Math.max(targetWire, tIdx), insertStep, gateName);
         }
       } else if (gateName === 'TOFFOLI') {
-        const c1 = targetWire;
         if (next.length >= 3) {
-          const c2 = c1 + 1 < next.length ? c1 + 1 : c1 - 1;
-          const tIdx = [c1 + 2, c1 - 1, c1 - 2].find(w => w >= 0 && w < next.length && w !== c2) ?? [...Array(next.length).keys()].find(w => w !== c1 && w !== c2);
-          next[c1][insertStep] = { name: gateName, role: 'control', controls: [c1, c2], targetWire: tIdx };
-          next[c2][insertStep] = { name: gateName, role: 'control', controls: [c1, c2], targetWire: tIdx };
-          next[tIdx][insertStep] = { name: gateName, role: 'target', controls: [c1, c2], targetWire: tIdx };
+          const { c2, target: tIdx } = findToffoliWires(targetWire, next.length);
+          writeToffoliGateCells(next, targetWire, c2, tIdx, insertStep);
         }
       } else if (gateName === 'BLANK') {
         next[targetWire][insertStep] = { blank: true };
@@ -180,20 +217,14 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
       if (TWO_WIRE.includes(gateName)) {
         const tIdx = wIdx < next.length - 1 ? wIdx + 1 : wIdx - 1;
         if (tIdx >= 0 && tIdx < next.length && !isOccupied(wIdx, sIdx) && !isOccupied(tIdx, sIdx)) {
-          const ctrlW = Math.min(wIdx, tIdx);
-          const tgtW  = Math.max(wIdx, tIdx);
-          next[ctrlW][sIdx] = { name: gateName, role: 'control', targetWire: tgtW };
-          next[tgtW][sIdx]  = { name: gateName, role: 'target',  controlWire: ctrlW };
+          writeTwoWireGateCells(next, Math.min(wIdx, tIdx), Math.max(wIdx, tIdx), sIdx, gateName);
           return next;
         }
       } else if (gateName === 'TOFFOLI') {
         if (next.length >= 3) {
-          const c2 = wIdx + 1 < next.length ? wIdx + 1 : wIdx - 1;
-          const tIdx = [wIdx + 2, wIdx - 1, wIdx - 2].find(w => w >= 0 && w < next.length && w !== c2) ?? [...Array(next.length).keys()].find(w => w !== wIdx && w !== c2);
+          const { c2, target: tIdx } = findToffoliWires(wIdx, next.length);
           if (!isOccupied(wIdx, sIdx) && !isOccupied(c2, sIdx) && !isOccupied(tIdx, sIdx)) {
-            next[wIdx][sIdx] = { name: gateName, role: 'control', controls: [wIdx, c2], targetWire: tIdx };
-            next[c2][sIdx] = { name: gateName, role: 'control', controls: [wIdx, c2], targetWire: tIdx };
-            next[tIdx][sIdx] = { name: gateName, role: 'target', controls: [wIdx, c2], targetWire: tIdx };
+            writeToffoliGateCells(next, wIdx, c2, tIdx, sIdx);
             return next;
           }
         }
@@ -255,6 +286,53 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
   }
 
   return prevCircuit;
+}
+
+/**
+ * Removes an entire wire (qubit row) from a circuit grid.
+ * Handles TWO_WIRE, TOFFOLI, BARRIER, and blank multi-qubit gates (BLANK_2, BLANK_3):
+ *  - Any gate whose peer/target/control is the removed wire is nulled out.
+ *  - Wire indices above the removed wire are decremented by 1.
+ */
+export function removeWireFromGrid(circuit, wireIndex) {
+  const cleaned = circuit.map((wire, wi) => {
+    if (wi === wireIndex) return wire; // filtered out below
+    return wire.map(cell => {
+      if (!cell) return cell;
+      if (TWO_WIRE.includes(cell.name)) {
+        const peerKey = cell.role === 'control' ? 'targetWire' : 'controlWire';
+        const peer = cell[peerKey];
+        if (peer === wireIndex) return null;
+        return peer > wireIndex ? { ...cell, [peerKey]: peer - 1 } : cell;
+      } else if (cell.name === 'TOFFOLI') {
+        if (cell.controls.includes(wireIndex) || cell.targetWire === wireIndex) return null;
+        return {
+          ...cell,
+          controls: cell.controls.map(c => c > wireIndex ? c - 1 : c),
+          targetWire: cell.targetWire > wireIndex ? cell.targetWire - 1 : cell.targetWire,
+        };
+      } else if (cell.name === 'BARRIER') {
+        const newTop    = cell.topWire    > wireIndex ? cell.topWire    - 1 : cell.topWire;
+        const newBottom = cell.bottomWire > wireIndex ? cell.bottomWire - 1 : cell.bottomWire;
+        if (newTop > newBottom) return null;
+        return { ...cell, topWire: newTop, bottomWire: newBottom };
+      } else if (cell.blank && cell.name === 'BLANK_2') {
+        const peerKey = cell.role === 'control' ? 'targetWire' : 'controlWire';
+        const peer = cell[peerKey];
+        if (peer === wireIndex) return null;
+        return peer > wireIndex ? { ...cell, [peerKey]: peer - 1 } : cell;
+      } else if (cell.blank && cell.name === 'BLANK_3') {
+        if (cell.controls.includes(wireIndex) || cell.targetWire === wireIndex) return null;
+        return {
+          ...cell,
+          controls: cell.controls.map(c => c > wireIndex ? c - 1 : c),
+          targetWire: cell.targetWire > wireIndex ? cell.targetWire - 1 : cell.targetWire,
+        };
+      }
+      return cell;
+    });
+  });
+  return cleaned.filter((_, i) => i !== wireIndex);
 }
 
 /**

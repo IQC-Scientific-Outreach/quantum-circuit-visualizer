@@ -58,7 +58,7 @@ function FilledBlankGate({ gateName, onClear }) {
  * to mark the boundary between the "given" question circuit and the
  * student-editable area (used for restrictToBlanks: false questions).
  */
-function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelete, separatorStep }) {
+function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelete, separatorStep, selectedQubit, onWireClick }) {
   const customRenderer = useCallback((cell, wireIndex, stepIndex) => {
     if (!cell) {
       if (restrictToBlanks) return null;
@@ -108,9 +108,17 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelet
     <div className="bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl p-5 inline-block min-w-max relative">
       {circuitState.map((wire, wireIndex) => (
         <div key={`wire-${wireIndex}`} className="flex items-center mb-2 last:mb-0">
-          <div className="w-16 font-mono font-medium text-right pr-4 text-sm text-slate-400 shrink-0">
+          <button
+            onClick={() => onWireClick && onWireClick(wireIndex)}
+            className={`w-16 font-mono font-medium text-right pr-4 text-sm shrink-0 transition-colors ${
+              selectedQubit === wireIndex
+                ? 'text-purple-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title={selectedQubit === wireIndex ? 'Clear ⟨Z⟩ selection' : `Show ⟨Z⟩ for q[${wireIndex}]`}
+          >
             q[{wireIndex}]
-          </div>
+          </button>
           <div className="flex relative items-center py-2 px-1">
             <div className="absolute left-0 right-0 h-px bg-slate-600 z-0" />
             {wire.flatMap((cell, stepIndex) => {
@@ -250,6 +258,7 @@ export default function QuestionsPage() {
   const [isReady,  setIsReady]  = useState(false);
   const [simResults, setSimResults] = useState(null);
   const [shots, setShots] = useState(100);
+  const [selectedQubit, setSelectedQubit] = useState(null);
 
   // ── Helper: reset everything for a given question set ──────────────────────
   function startQuiz(qs) {
@@ -299,15 +308,16 @@ export default function QuestionsPage() {
         if (cell.blank) return cell.filled ? { ...cell, name: cell.filled } : null;
         return { ...cell };
       }));
-      setSimResults(simulateCircuit(engine, normalizedCircuit, null, shots, null));
+      setSimResults(simulateCircuit(engine, normalizedCircuit, null, shots, selectedQubit));
     }
-  }, [circuitState, isReady, engine, shots]);
+  }, [circuitState, isReady, engine, shots, selectedQubit]);
 
   // ── Reset circuit + UI state whenever the question changes ──────────────────
   useEffect(() => {
     setCircuitState(initCircuit(question));
     setFeedback(null);
     setAnswerRevealed(false);
+    setSelectedQubit(null);
   }, [questionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-expand circuit state to always have empty buffer slots at the end ──
@@ -748,6 +758,8 @@ export default function QuestionsPage() {
               restrictToBlanks={question.restrictToBlanks}
               onDelete={deleteGate}
               separatorStep={separatorStep}
+              selectedQubit={selectedQubit}
+              onWireClick={wi => setSelectedQubit(prev => prev === wi ? null : wi)}
             />
           </div>
 
@@ -801,7 +813,7 @@ export default function QuestionsPage() {
           isReady={isReady}
           circuit={circuitState}
           measureStep={null}
-          selectedQubit={null}
+          selectedQubit={selectedQubit}
           simResults={simResults}
           shots={shots}
           setShots={setShots}
@@ -811,7 +823,7 @@ export default function QuestionsPage() {
               if (c.blank) return c.filled ? { ...c, name: c.filled } : null;
               return { ...c };
             }));
-            setSimResults(simulateCircuit(engine, normalizedCircuit, null, shots, null));
+            setSimResults(simulateCircuit(engine, normalizedCircuit, null, shots, selectedQubit));
           }}
         />
       </div>

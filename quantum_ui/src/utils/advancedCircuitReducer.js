@@ -1,14 +1,12 @@
 import { compactCircuit } from './compactCircuit';
-import { removeGateFromCircuit } from './circuitDnD';
-
-const TWO_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z'];
-
-export const insertColumnIfOccupied = (circuitGrid, stepIndex, wiresToCheck) => {
-  const needsInsert = wiresToCheck.some(w => circuitGrid[w] && circuitGrid[w][stepIndex] !== null && !circuitGrid[w][stepIndex].blank);
-  if (needsInsert) {
-    circuitGrid.forEach(wire => wire.splice(stepIndex, 0, null));
-  }
-};
+import {
+  TWO_WIRE,
+  removeGateFromCircuit,
+  insertColumnIfOccupied,
+  writeTwoWireGateCells,
+  writeToffoliGateCells,
+  findToffoliWires,
+} from './circuitDnD';
 
 export function applyAdvancedDrop(prev, gateData, slotData) {
   let newCircuit = prev.map(wire => [...wire]);
@@ -80,12 +78,10 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
     } else if (gateData.name === 'TOFFOLI') {
       c1 = slotData.wireIndex;
       if (prev.length < 3) return prev;
-      c2 = c1 + 1 < prev.length ? c1 + 1 : c1 - 1;
-      tIndex = [c1 + 2, c1 - 1, c1 - 2].find(w => w >= 0 && w < prev.length && w !== c2) ?? 
-                     [...Array(prev.length).keys()].find(w => w !== c1 && w !== c2);
-      const c1Measured = prev[c1]?.some(c => c?.name === 'MEASURE') ?? false;
-      const c2Measured = prev[c2]?.some(c => c?.name === 'MEASURE') ?? false;
-      const tgtMeasured  = prev[tIndex]?.some(c => c?.name === 'MEASURE') ?? false;
+      ({ c2, target: tIndex } = findToffoliWires(c1, prev.length));
+      const c1Measured  = prev[c1]?.some(c => c?.name === 'MEASURE') ?? false;
+      const c2Measured  = prev[c2]?.some(c => c?.name === 'MEASURE') ?? false;
+      const tgtMeasured = prev[tIndex]?.some(c => c?.name === 'MEASURE') ?? false;
       if (c1Measured || c2Measured || tgtMeasured) return prev;
       targetWires = [c1, c2, tIndex];
     } else {
@@ -96,12 +92,9 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
     insertColumnIfOccupied(newCircuit, step, targetWires);
 
     if (TWO_WIRE.includes(gateData.name)) {
-      newCircuit[cIndex][step] = { name: gateData.name, role: 'control', targetWire: tIndex };
-      newCircuit[tIndex][step] = { name: gateData.name, role: 'target', controlWire: cIndex };
+      writeTwoWireGateCells(newCircuit, cIndex, tIndex, step, gateData.name);
     } else if (gateData.name === 'TOFFOLI') {
-      newCircuit[c1][step] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
-      newCircuit[c2][step] = { name: 'TOFFOLI', role: 'control', controls: [c1, c2], targetWire: tIndex };
-      newCircuit[tIndex][step] = { name: 'TOFFOLI', role: 'target', controls: [c1, c2], targetWire: tIndex };
+      writeToffoliGateCells(newCircuit, c1, c2, tIndex, step);
     } else {
       newCircuit[slotData.wireIndex][step] = { name: gateData.name };
     }

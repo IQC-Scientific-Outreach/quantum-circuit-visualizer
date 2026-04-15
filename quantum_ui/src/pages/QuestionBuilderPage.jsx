@@ -13,7 +13,7 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import GateVisual from '../components/GateVisual';
 import { GATE_STYLES } from '../constants';
-import { applyGateDrop, TWO_WIRE, removeGateFromCircuit } from '../utils/circuitDnD';
+import { applyGateDrop, TWO_WIRE, removeGateFromCircuit, removeWireFromGrid } from '../utils/circuitDnD';
 import DraggableCnotNode from '../components/DraggableCnotNode';
 import DraggablePlacedGate from '../components/DraggablePlacedGate';
 import DropZone from '../components/DropZone';
@@ -544,14 +544,15 @@ function QuestionEditor({ question: q, onChange }) {
   }
   function removeWire() {
     if (q.nQubits <= 1) return;
-    const d = q.nQubits - 1;
+    const d = q.nQubits - 1; // index of last wire to remove
+    const newCircuit = removeWireFromGrid(q.circuit, d);
+    const newAnswerCircuit = removeWireFromGrid(q.answerCircuit, d);
     const newExact = Object.fromEntries(
       Object.entries(q.exactAnswer).filter(([k]) => Number(k.split('_')[0]) < d)
     );
     update({
-      nQubits: d, circuit: q.circuit.slice(0, d), exactAnswer: newExact,
-      answerNQubits: d,
-      answerCircuit: q.answerCircuit.slice(0, d),
+      nQubits: d, circuit: newCircuit, exactAnswer: newExact,
+      answerNQubits: d, answerCircuit: newAnswerCircuit,
     });
   }
   function addStep()    { update({ nSteps: q.nSteps + 1, circuit: q.circuit.map(w => [...w, null]) }); }

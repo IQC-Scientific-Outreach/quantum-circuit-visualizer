@@ -1,9 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import GateVisual from './GateVisual';
-import { GATE_STYLES } from '../constants';
-
-const MULTI_WIRE = ['CNOT', 'CZ', 'FF_x', 'FF_Z', 'TOFFOLI', 'BARRIER'];
+import { GATE_STYLES, MULTI_WIRE_GATES } from '../constants';
 
 /**
  * A draggable gate tile shown in the sidebar palette.
@@ -27,7 +25,7 @@ const DraggableGate = ({ gate }) => {
 
   const baseClasses = `transition-all cursor-grab flex items-center justify-center font-bold ${isDragging ? 'opacity-50' : ''}`;
 
-  if (MULTI_WIRE.includes(gate)) {
+  if (MULTI_WIRE_GATES.includes(gate)) {
     return (
       <div ref={ref} className={`${baseClasses} p-2 ${GATE_STYLES[gate]}`}>
         <GateVisual name={gate} />
