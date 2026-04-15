@@ -27,7 +27,7 @@ import 'katex/dist/katex.min.css';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SINGLE_GATES   = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
-const ALL_PALETTE_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE', 'CNOT', 'CZ', 'FF_x', 'FF_Z', 'TOFFOLI', 'BARRIER'];
+const ALL_PALETTE_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE', 'CNOT', 'CZ', 'FF_X', 'FF_Z', 'TOFFOLI', 'BARRIER'];
 
 // Row height = h-14 (56 px) + gap-2 (8 px) = 64 px = 4 rem  (center-to-center)
 const ROW_REM = 4;
@@ -971,7 +971,7 @@ export default function QuestionBuilderPage() {
 
         <main className="flex-1 overflow-y-auto p-6">
           {selectedQ
-            ? <QuestionEditor question={selectedQ} onChange={updateQuestion} />
+            ? <QuestionEditor key={selectedQ.id} question={selectedQ} onChange={updateQuestion} />
             : <div className="text-slate-500 text-sm mt-8 text-center">Select a question or click "+ New Question".</div>
           }
         </main>

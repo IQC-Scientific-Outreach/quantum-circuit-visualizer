@@ -163,7 +163,7 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
   }
 
   if (isCnotSwap) {
-    const isClassical = ['FF_x', 'FF_Z'].includes(sourceData.name);
+    const isClassical = ['FF_X', 'FF_Z'].includes(sourceData.name);
     const oldWire = sourceData.wireIndex;
     const peerWire = sourceData.peerWire;
     const step = sourceData.stepIndex;
@@ -227,7 +227,7 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
 
     if (sourceData.type === 'gate') {
       const gateName = sourceData.name;
-      const isClassical = ['FF_x', 'FF_Z'].includes(gateName);
+      const isClassical = ['FF_X', 'FF_Z'].includes(gateName);
       if (TWO_WIRE.includes(gateName)) {
         const tIdx = targetWire < next.length - 1 ? targetWire + 1 : targetWire - 1;
         if (tIdx >= 0 && tIdx < next.length) {
@@ -242,7 +242,7 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
         }
       }
     } else if (sourceData.type === 'cnot-node') {
-      const isClassical = ['FF_x', 'FF_Z'].includes(sourceData.name);
+      const isClassical = ['FF_X', 'FF_Z'].includes(sourceData.name);
       if (sourceData.role === 'control') {
         if (isClassical && !isMeasured(targetWire)) return prevCircuit;
         if (!isClassical && isMeasured(targetWire)) return prevCircuit;
@@ -320,7 +320,7 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
   if (destData.type === 'slot') {
     if (sourceData.type === 'gate') {
       const gateName = sourceData.name;
-      const isClassical = ['FF_x', 'FF_Z'].includes(gateName);
+      const isClassical = ['FF_X', 'FF_Z'].includes(gateName);
       if (TWO_WIRE.includes(gateName)) {
         const tIdx = wIdx < next.length - 1 ? wIdx + 1 : wIdx - 1;
         if (tIdx >= 0 && tIdx < next.length && !isOccupied(wIdx, sIdx) && !isOccupied(tIdx, sIdx)) {
@@ -365,7 +365,7 @@ export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
 
     if (sourceData.type === 'cnot-node') {
       const { wireIndex: oldW, stepIndex: oldS, name, role, peerWire } = sourceData;
-      const isClassical = ['FF_x', 'FF_Z'].includes(name);
+      const isClassical = ['FF_X', 'FF_Z'].includes(name);
       if (sIdx === oldS && !isOccupied(wIdx, sIdx) && wIdx !== peerWire) {
         if (role === 'control') {
           if (isClassical && !isMeasured(wIdx)) return prevCircuit;

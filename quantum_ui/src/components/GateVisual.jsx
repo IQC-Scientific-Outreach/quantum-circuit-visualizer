@@ -42,7 +42,7 @@ const GateVisual = ({ name }) => {
     );
   }
 
-  if (name === 'FF_x') {
+  if (name === 'FF_X') {
     // Classically-controlled X: filled-square control, square-X target
     return (
       <svg className="w-8 h-12" viewBox="0 0 24 32" fill="none" stroke="currentColor">

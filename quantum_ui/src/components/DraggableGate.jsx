@@ -5,7 +5,7 @@ import { GATE_STYLES, MULTI_WIRE_GATES } from '../constants';
 
 /**
  * A draggable gate tile shown in the sidebar palette.
- * Two-wire gates (CNOT, FF_x, FF_Z) use a compact icon layout.
+ * Two-wire gates (CNOT, FF_X, FF_Z) use a compact icon layout.
  * Single-qubit gates use a square tile.
  */
 const DraggableGate = ({ gate }) => {

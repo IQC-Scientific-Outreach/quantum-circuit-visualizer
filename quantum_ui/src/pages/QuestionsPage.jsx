@@ -367,7 +367,7 @@ export default function QuestionsPage() {
           if (source.data.type === 'gate' && cell?.blank && (cell.name === 'BLANK_2' || cell.name === 'BLANK_3')) {
             const is2Wire = TWO_WIRE.includes(source.data.name);
             const is3Wire = source.data.name === 'TOFFOLI';
-            const isClassical = ['FF_x', 'FF_Z'].includes(source.data.name);
+            const isClassical = ['FF_X', 'FF_Z'].includes(source.data.name);
             
             const isMeasured = (w) => prev[w]?.some(c => c?.name === 'MEASURE' || (c?.blank && c?.filled === 'MEASURE')) ?? false;
 

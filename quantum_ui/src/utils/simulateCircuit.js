@@ -41,7 +41,7 @@ export function simulateCircuit(engine, circuit, targetStep = null, shots = 100,
 
     if (inst.name !== 'MEASURE') {
       let deferredName = inst.name;
-      if (inst.name === 'FF_x') deferredName = 'CNOT';
+      if (inst.name === 'FF_X') deferredName = 'CNOT';
       else if (inst.name === 'FF_Z') deferredName = 'CZ';
 
       const cppQubitsDisplay = new engine.VectorInt();

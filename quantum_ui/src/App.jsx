@@ -204,7 +204,7 @@ function App() {
               //           target must always be unmeasured.
               const ctrlMeasured = prev[cIndex]?.some(c => c?.name === 'MEASURE') ?? false;
               const tgtMeasured  = prev[tIndex]?.some(c => c?.name === 'MEASURE') ?? false;
-              const isClassical  = ['FF_x', 'FF_Z'].includes(gateData.name);
+              const isClassical  = ['FF_X', 'FF_Z'].includes(gateData.name);
               if (isClassical && !ctrlMeasured) return prev;
               if (!isClassical && ctrlMeasured) return prev;
               if (tgtMeasured) return prev;
@@ -251,7 +251,7 @@ function App() {
             // Validate control-wire constraint when the control node is being moved
             if (role === 'control') {
               const isMeasured = prev[newWire]?.some(c => c?.name === 'MEASURE') ?? false;
-              const isClassical = ['FF_x', 'FF_Z'].includes(gateName);
+              const isClassical = ['FF_X', 'FF_Z'].includes(gateName);
               if (isClassical && !isMeasured) return prev;
               if (!isClassical && isMeasured) return prev;
             }
@@ -611,7 +611,7 @@ function App() {
           <div>
             <p className="text-[10px] font-semibold text-amber-500/70 uppercase tracking-widest mb-2">Classical ctrl</p>
             <div className="flex gap-2 justify-center">
-              {['FF_x', 'FF_Z'].map(gate => (
+              {['FF_X', 'FF_Z'].map(gate => (
                 <DraggableGate key={gate} gate={gate} />
               ))}
             </div>

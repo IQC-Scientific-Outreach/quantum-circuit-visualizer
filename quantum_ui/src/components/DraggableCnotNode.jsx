@@ -2,14 +2,14 @@ import { useRef, useEffect, useState } from 'react';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 
 /**
- * Renders one node of a placed multi-wire gate: CNOT, CZ, FF_x, FF_Z, or TOFFOLI.
+ * Renders one node of a placed multi-wire gate: CNOT, CZ, FF_X, FF_Z, or TOFFOLI.
  *
  * Quantum (CNOT, CZ, TOFFOLI) — slate color
  *   CNOT / TOFFOLI control: filled circle   target: X
  *   CZ             control: filled circle   target: filled circle
  *
- * Classically-controlled (FF_x, FF_Z) — amber color
- *   FF_x  control: filled square   target: ⊕
+ * Classically-controlled (FF_X, FF_Z) — amber color
+ *   FF_X  control: filled square   target: ⊕
  *   FF_Z  control: filled square   target: Z-box
  */
 const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
@@ -66,7 +66,7 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
     return () => { cleanupDrag(); cleanupDrop(); };
   }, [cell, wireIndex, stepIndex]);
 
-  const isClassical = cell.name === 'FF_x' || cell.name === 'FF_Z';
+  const isClassical = cell.name === 'FF_X' || cell.name === 'FF_Z';
   const isBlank = cell.name === 'BLANK_2' || cell.name === 'BLANK_3';
 
   const baseClasses = `absolute w-full h-full flex items-center justify-center cursor-grab transition-all z-20
@@ -89,7 +89,7 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
         <div className="w-3.5 h-3.5 rounded-full bg-slate-300" />
       )}
       {cell.role === 'control' && isClassical && !isBlank && (
-        // FF_x or FF_Z: classical filled square
+        // FF_X or FF_Z: classical filled square
         <div className="w-3.5 h-3.5 rounded-sm bg-amber-400" />
       )}
 
@@ -106,8 +106,8 @@ const DraggableCnotNode = ({ cell, wireIndex, stepIndex }) => {
           <span className="text-slate-300 text-base font-bold leading-none select-none">Z</span>
         </div>
       )}
-      {/* FF_x target: square with X (amber) */}
-      {cell.role === 'target' && cell.name === 'FF_x' && (
+      {/* FF_X target: square with X (amber) */}
+      {cell.role === 'target' && cell.name === 'FF_X' && (
         <div className="w-9 h-9 border-2 border-amber-400/80 bg-amber-900/30 rounded flex items-center justify-center">
           <span className="text-amber-200 text-base font-bold leading-none select-none">X</span>
         </div>
