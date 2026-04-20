@@ -631,6 +631,69 @@
     "explanation": "We know that we can add a $H$ gate before measurement to measure in the $+/-$ basis. Despite changing the basis of measurement, did you notice that our qubits are still entangled?"
   },
   {
+    "id": 23,
+    "title": "Feed Forward Gate & Mixed States",
+    "description": "When we measure a qubit that's entangled with another, the unmeasured qubit collapses into a definite but random state. In the circuit below, $\\ket{\\Psi^+}$ is created and $q_0$ is measured. \nSince $q_1$ collapses into the same state as $q_0$, and is either $\\ket0$ or $\\ket1$ with equal probability, its expectation value is $\\langle Z \\rangle = 0$. For this state, notice $\\langle Y \\rangle = \\langle X \\rangle = 0$ as well. This is known as a **mixed state**.\n(Note that it is NOT a superposition)\n\n\nTo make $q_1$ back into a pure state, we can use feed-forward gates! This is a quantum operation that is applied conditionally based on the classical result of a prior measurement.\n\nAn example is our feed-forward X (ffx) gate, which applies $X$ on a qubit if its classical control is 1.\n\n\nUse a feed-forward $X$ gate to ensure $q_1$ is always $0$. Do the expectation values show that it is a mixed state or a pure state?",
+    "points": 5,
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "FF_X"
+    ],
+    "nQubits": 2,
+    "nSteps": 4,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        },
+        {
+          "name": "MEASURE"
+        },
+        {
+          "name": "BLANK_2",
+          "role": "control",
+          "targetWire": 1,
+          "blank": true
+        }
+      ],
+      [
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        },
+        null,
+        {
+          "name": "BLANK_2",
+          "role": "target",
+          "controlWire": 0,
+          "blank": true
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_3": "FF_X"
+    },
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "We see $\\langle Z\\rangle = 1$! \nWe consider a state \"pure\" if $|\\langle Z\\rangle|^2+|\\langle Y\\rangle|^2+|\\langle X\\rangle|^2 = 1$, which is true after having our feed-forward X gate."
+  },
+  {
     "id": 18,
     "title": "Reversible circuits",
     "description": "Observing the amplitudes of the circuit, try to reverse the circuit to obtain $\\ket{00}$\n\nHint: does applying $CX$ twice affect the circuit?",

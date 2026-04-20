@@ -400,7 +400,7 @@ function BuilderCircuitGrid({
           if (isBlank2) proxyName = 'CNOT';
           if (isBlank3) proxyName = 'TOFFOLI';
 
-          const res = applyGateDrop(prevCircuit, { ...source.data, name: proxyName }, dest.data);
+          const res = applyGateDrop(prevCircuit, { ...source.data, name: proxyName }, dest.data, { allowAfterMeasure: true });
           
           if (isBlank1 || isBlank2 || isBlank3) {
             return res.map(wire => wire.map(c => {

@@ -77,14 +77,17 @@ export function clearGatesAfterMeasure(circuit) {
  * swapping, and inserting gates (including multi-qubit gates like CNOT and TOFFOLI).
  */
 export function applyGateDrop(prevCircuit, sourceData, destData, options = {}) {
-  const { hiddenBlocks = [] } = options;
+  const { hiddenBlocks = [], allowAfterMeasure = false } = options;
 
   let next = prevCircuit.map(w => [...w]);
   const wIdx = destData.wireIndex;
   const sIdx = destData.stepIndex;
 
   const isOccupied = (w, s) => next[w]?.[s] != null && !next[w][s].blank;
-  const isMeasured = (w) => prevCircuit[w]?.some(c => c?.name === 'MEASURE' || (c?.blank && c?.filled === 'MEASURE')) ?? false;
+  const isMeasured = (w) => {
+    if (allowAfterMeasure) return false;
+    return prevCircuit[w]?.some(c => c?.name === 'MEASURE' || (c?.blank && c?.filled === 'MEASURE')) ?? false;
+  };
 
   // 1. Dropping onto a question-blank slot (Questions tab)
   if (destData.type === 'question-blank') {
