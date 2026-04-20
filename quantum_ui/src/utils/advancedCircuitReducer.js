@@ -6,6 +6,7 @@ import {
   writeTwoWireGateCells,
   writeToffoliGateCells,
   findToffoliWires,
+  clearGatesAfterMeasure,
 } from './circuitDnD';
 
 export function applyAdvancedDrop(prev, gateData, slotData) {
@@ -20,7 +21,7 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
     for (let w = 0; w < numW; w++) {
       newCircuit[w][step] = { name: 'BARRIER', topWire: 0, bottomWire: numW - 1 };
     }
-    return compactCircuit(newCircuit);
+    return compactCircuit(clearGatesAfterMeasure(newCircuit));
   }
 
   // Whole-barrier move
@@ -34,7 +35,7 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
     for (let w = topWire; w <= bottomWire; w++) {
       newCircuit[w][newStep] = { name: 'BARRIER', topWire, bottomWire };
     }
-    return compactCircuit(newCircuit);
+    return compactCircuit(clearGatesAfterMeasure(newCircuit));
   }
 
   // Barrier end-node resize
@@ -56,7 +57,7 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
     for (let w = newTop; w <= newBottom; w++) {
       newCircuit[w][barrStep] = { name: 'BARRIER', topWire: newTop, bottomWire: newBottom };
     }
-    return compactCircuit(newCircuit);
+    return compactCircuit(clearGatesAfterMeasure(newCircuit));
   }
 
   // Drop from palette
@@ -98,7 +99,7 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
     } else {
       newCircuit[slotData.wireIndex][step] = { name: gateData.name };
     }
-    return compactCircuit(newCircuit);
+    return compactCircuit(clearGatesAfterMeasure(newCircuit));
   }
 
   // Move 2-wire node
@@ -123,7 +124,7 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
       name: gateName, role: role === 'control' ? 'target' : 'control',
       [role === 'control' ? 'controlWire' : 'targetWire']: newWire,
     };
-    return compactCircuit(newCircuit);
+    return compactCircuit(clearGatesAfterMeasure(newCircuit));
   }
 
   // Move Toffoli node
@@ -158,7 +159,7 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
       newCircuit[controls[0]][oldStep].targetWire = newTarget;
       newCircuit[controls[1]][oldStep].targetWire = newTarget;
     }
-    return compactCircuit(newCircuit);
+    return compactCircuit(clearGatesAfterMeasure(newCircuit));
   }
 
   // Move single gate
@@ -170,7 +171,7 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
     newCircuit[oldWire][oldStep] = null;
     insertColumnIfOccupied(newCircuit, newStep, [newWire]);
     newCircuit[newWire][newStep] = { name };
-    return compactCircuit(newCircuit);
+    return compactCircuit(clearGatesAfterMeasure(newCircuit));
   }
 
   // Handle swaps and insertions (which utilize existing gate code so we don't repeat logic fully)
@@ -179,5 +180,5 @@ export function applyAdvancedDrop(prev, gateData, slotData) {
 }
 
 export function advancedDeleteGate(prev, wireIndex, stepIndex) {
-  return compactCircuit(removeGateFromCircuit(prev, wireIndex, stepIndex));
+  return compactCircuit(clearGatesAfterMeasure(removeGateFromCircuit(prev, wireIndex, stepIndex)));
 }

@@ -8,7 +8,7 @@ import { SINGLE_QUBIT_GATES, MAX_QUBITS } from './constants';
 import { compactCircuit } from './utils/compactCircuit';
 import { simulateCircuit } from './utils/simulateCircuit';
 import { circuitToCode, parseCode } from './utils/circuitCode';
-import { removeGateFromCircuit, removeWireFromGrid, TWO_WIRE, insertColumnIfOccupied, writeTwoWireGateCells, writeToffoliGateCells, findToffoliWires } from './utils/circuitDnD';
+import { removeGateFromCircuit, removeWireFromGrid, TWO_WIRE, insertColumnIfOccupied, writeTwoWireGateCells, writeToffoliGateCells, findToffoliWires, clearGatesAfterMeasure } from './utils/circuitDnD';
 import DraggableGate from './components/DraggableGate';
 import DraggableCnotNode from './components/DraggableCnotNode';
 import DraggablePlacedGate from './components/DraggablePlacedGate';
@@ -131,7 +131,7 @@ function App() {
             for (let w = 0; w < numW; w++) {
               newCircuit[w][step] = { name: 'BARRIER', topWire: 0, bottomWire: numW - 1 };
             }
-            return compactCircuit(newCircuit);
+            return compactCircuit(clearGatesAfterMeasure(newCircuit));
           });
           return;
         }
@@ -152,7 +152,7 @@ function App() {
             for (let w = topWire; w <= bottomWire; w++) {
               newCircuit[w][newStep] = { name: 'BARRIER', topWire, bottomWire };
             }
-            return compactCircuit(newCircuit);
+            return compactCircuit(clearGatesAfterMeasure(newCircuit));
           });
           return;
         }
@@ -184,7 +184,7 @@ function App() {
             for (let w = newTop; w <= newBottom; w++) {
               newCircuit[w][barrStep] = { name: 'BARRIER', topWire: newTop, bottomWire: newBottom };
             }
-            return compactCircuit(newCircuit);
+            return compactCircuit(clearGatesAfterMeasure(newCircuit));
           });
           return;
         }
@@ -233,7 +233,7 @@ function App() {
             } else {
               newCircuit[slotData.wireIndex][step] = { name: gateData.name };
             }
-            return compactCircuit(newCircuit);
+            return compactCircuit(clearGatesAfterMeasure(newCircuit));
           });
           return;
         }
@@ -311,7 +311,7 @@ function App() {
               newCircuit[controls[0]][oldStep].targetWire = newTarget;
               newCircuit[controls[1]][oldStep].targetWire = newTarget;
             }
-            return compactCircuit(newCircuit);
+            return compactCircuit(clearGatesAfterMeasure(newCircuit));
           });
           return;
         }
@@ -374,7 +374,7 @@ function App() {
             newCircuit[newControls[1]][step].targetWire = newTarget;
             newCircuit[newTarget][step].controls = newControls;
             newCircuit[newTarget][step].targetWire = newTarget;
-            return compactCircuit(newCircuit);
+            return compactCircuit(clearGatesAfterMeasure(newCircuit));
           });
           return;
         }
@@ -396,7 +396,7 @@ function App() {
               role: gateData.role,
               [gateData.role === 'control' ? 'targetWire' : 'controlWire']: oldWire,
             };
-            return compactCircuit(newCircuit);
+            return compactCircuit(clearGatesAfterMeasure(newCircuit));
           });
           return;
         }
@@ -476,7 +476,7 @@ function App() {
               }
             }
 
-            return compactCircuit(newCircuit);
+            return compactCircuit(clearGatesAfterMeasure(newCircuit));
           });
         }
       },
@@ -488,7 +488,7 @@ function App() {
   // ---------------------------------------------------------------------------
   const deleteGate = useCallback((wireIndex, stepIndex) => {
     setCircuit(prev => {
-      return compactCircuit(removeGateFromCircuit(prev, wireIndex, stepIndex));
+      return compactCircuit(clearGatesAfterMeasure(removeGateFromCircuit(prev, wireIndex, stepIndex)));
     });
   }, []);
 
@@ -514,7 +514,7 @@ function App() {
       for (let w = newTop; w <= newBottom; w++) {
         newCircuit[w][stepIndex] = { name: 'BARRIER', topWire: newTop, bottomWire: newBottom };
       }
-      return compactCircuit(newCircuit);
+      return compactCircuit(clearGatesAfterMeasure(newCircuit));
     });
   }, []);
 
@@ -531,7 +531,7 @@ function App() {
 
   const removeQubit = (indexToRemove) => {
     if (circuit.length <= 1) return;
-    setCircuit(prev => compactCircuit(removeWireFromGrid(prev, indexToRemove)));
+    setCircuit(prev => compactCircuit(clearGatesAfterMeasure(removeWireFromGrid(prev, indexToRemove))));
   };
 
   // ---------------------------------------------------------------------------
@@ -548,7 +548,7 @@ function App() {
       return;
     }
     setCodeError(null);
-    setCircuit(parsed);
+    setCircuit(compactCircuit(clearGatesAfterMeasure(parsed)));
   };
 
   const handleCodeKeyDown = (e) => {

@@ -42,6 +42,29 @@ export function findToffoliWires(primaryWire, numWires) {
   return { c2, target };
 }
 
+/** Clears all gates that appear after a MEASURE gate on any wire. */
+export function clearGatesAfterMeasure(circuit) {
+  let next = circuit;
+  for (let w = 0; w < next.length; w++) {
+    let measureStep = -1;
+    for (let s = 0; s < next[w].length; s++) {
+      const cell = next[w][s];
+      if (cell && (cell.name === 'MEASURE' || (cell.blank && cell.filled === 'MEASURE'))) {
+        measureStep = s;
+        break;
+      }
+    }
+    if (measureStep !== -1) {
+      for (let s = measureStep + 1; s < next[w].length; s++) {
+        if (next[w][s]) {
+          next = removeGateFromCircuit(next, w, s);
+        }
+      }
+    }
+  }
+  return next;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
