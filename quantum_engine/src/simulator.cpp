@@ -26,11 +26,13 @@ void Simulator::run(const vector<Instruction>& circuit) {
 
         } else if (inst.name == "FF_X") {
             // qubits[0] = source (measured), qubits[1] = target
+            if (inst.qubits.size() < 2) throw invalid_argument("FF_X requires 2 qubits");
             int src = inst.qubits[0], tgt = inst.qubits[1];
             if (classical_bits[src] == 1)
                 q_state.apply_1q_gate(GateRegistry::base_gates.at("X"), tgt);
 
         } else if (inst.name == "FF_Z") {
+            if (inst.qubits.size() < 2) throw invalid_argument("FF_Z requires 2 qubits");
             int src = inst.qubits[0], tgt = inst.qubits[1];
             if (classical_bits[src] == 1)
                 q_state.apply_1q_gate(GateRegistry::base_gates.at("Z"), tgt);
