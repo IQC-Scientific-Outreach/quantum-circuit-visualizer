@@ -23,7 +23,8 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": ""
   },
   {
     "id": 5,
@@ -72,7 +73,8 @@
         "startStep": 0,
         "endStep": 0
       }
-    ]
+    ],
+    "explanation": ""
   },
   {
     "id": 20,
@@ -266,7 +268,8 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "$HZH=X$! This works because the $Z$ gate does the same thing to the $X$ basis that the $X$ gate does to the $Z$ basis. By changing the basis before and after the $Z$ gate with Hadamards, we effectively implement an $X$ operation"
   },
   {
     "id": 9,
@@ -314,8 +317,8 @@
   },
   {
     "id": 8,
-    "title": "Relative & Global Phase",
-    "description": "In quantum mechanics, a state $e^{i\\theta}\\ket{\\psi}$ is said to have a **global phase** $\\theta$. Global phases are physically irrelevant. \nHowever, given a state $\\ket{\\psi} = \\ket0 + e^{i\\phi}\\ket1$, we have a **relative phase** $\\phi$, which is physically relevant.\n\n\nWe have $$Y = i\\ket0\\bra1 - i\\ket1\\bra0 = \\ket{+i}\\bra{-i} + \\ket{-i}\\bra{+i}$$, which flips the state over the Y axis. \nTo get back to the $\\ket0$ state in the given circuit, the missing gate must flip both the $0/1$ components (similar to the $X$ gate) and also add a relative phase between the two components (similar to the $Z$ gate). Find the singular gate that accomplishes this.",
+    "title": "The Third Pauli",
+    "description": "We have $$Y = i\\ket0\\bra1 - i\\ket1\\bra0 = \\ket{+i}\\bra{-i} + \\ket{-i}\\bra{+i}$$, which flips the state over the Y axis. $Y$ is the final Pauli gate along with $X$ and $Z$, and they are related as $Y=iZX, Z=iXY,$ and $X=iYZ$\n\n\nTo get back to the $\\ket0$ state in the given circuit, the missing gate must flip both the $0/1$ components (similar to the $X$ gate) and also add a relative phase between the two components (similar to the $Z$ gate). Find the singular gate that accomplishes this.",
     "points": 10,
     "restrictToBlanks": true,
     "allowedGates": [
@@ -362,6 +365,39 @@
         },
         {
           "name": "Z"
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 13,
+    "title": "Expectation Values",
+    "description": "The expectation value is the average value you would measure if you repeated an experiment many times. Binary (or ±1) quantum observables can be built in any basis by assigning each of our orthonormal states to the values of $+1$ or $-1$. For example, we \nFor a single qubit state $\\ket{\\psi}$, $\\langle A\\rangle = \\bra{\\psi}A\\ket{\\psi}$. \n\n\nYou can see the expectation values $\\langle X\\rangle, \\langle Y\\rangle, \\langle Z\\rangle$ of a qubit in the simulator by clicking on its label $q[n]$.\n\nUsing only the Hadamard and T gates, manipulate the state such that $\\langle Y\\rangle= 1$",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "T"
+    ],
+    "nQubits": 1,
+    "nSteps": 0,
+    "circuit": [
+      []
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 3,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "T"
+        },
+        {
+          "name": "T"
         }
       ]
     ],
@@ -782,39 +818,6 @@
             0
           ],
           "targetWire": 1
-        }
-      ]
-    ],
-    "hiddenBlocks": []
-  },
-  {
-    "id": 13,
-    "title": "Expectation Values",
-    "description": "The expectation value is the average value you would measure if you repeated an experiment many times. Binary (or ±1) quantum observables can be built in any basis by assigning each of our orthonormal states to the values of $+1$ or $-1$. For example, we \nFor a single qubit state $\\ket{\\psi}$, $\\langle A\\rangle = \\bra{\\psi}A\\ket{\\psi}$. \n\n\nYou can see the expectation values $\\langle X\\rangle, \\langle Y\\rangle, \\langle Z\\rangle$ of a qubit in the simulator by clicking on its label $q[n]$.\n\nUsing only the Hadamard and T gates, manipulate the state such that $\\langle Y\\rangle= 1$",
-    "points": 10,
-    "restrictToBlanks": false,
-    "allowedGates": [
-      "H",
-      "T"
-    ],
-    "nQubits": 1,
-    "nSteps": 0,
-    "circuit": [
-      []
-    ],
-    "exactAnswer": {},
-    "answerNQubits": 1,
-    "answerNSteps": 3,
-    "answerCircuit": [
-      [
-        {
-          "name": "H"
-        },
-        {
-          "name": "T"
-        },
-        {
-          "name": "T"
         }
       ]
     ],
