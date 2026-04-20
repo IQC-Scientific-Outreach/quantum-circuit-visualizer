@@ -22,94 +22,86 @@
  * 
  * Add more questions to the array to scale the quiz — no other changes required.
  */
-export const QUESTIONS = [
-  {
-    id: 1,
-    title: 'Create an X Gate',
-    description:
-      'The circuit below has H gates on either side of a blank. ' +
-      'Fill the blank with a single gate so that the whole circuit acts as an X gate. $X$' /*+
-      'Hint: H Z H = X.'*/,
-    points: 10,
-    restrictToBlanks: true,
-    allowedGates: ['H', 'X', 'Y', 'Z', 'T'],
-    // 1 qubit, 3 steps: H | blank | H
-    circuit: [
-      [
-        { name: 'H', locked: true },
-        { blank: true },
-        { name: 'H', locked: true },
-      ],
-    ],
-    // The blank at (wire 0, step 1) must be filled with Z
-    answer: [{ wireIndex: 0, stepIndex: 1, gate: 'Z' }],
-  },
-  {
-    id: 2,
-    title: 'Create Bell State |Φ⁻⟩',
-    description:
-      'Create the entangled Bell state (|00⟩ − |11⟩)/√2. ' +
-      'The H and CNOT are already placed. ' +
-      'Fill the blank on qubit 0 before the H gate.',
-    points: 15,
-    restrictToBlanks: true,
-    allowedGates: ['H', 'X', 'Y', 'Z', 'T'],
-    // 2 qubits, 3 steps
-    // q[0]: blank | H | CNOT-control
-    // q[1]: (inactive) | (inactive) | CNOT-target
-    circuit: [
-      [
-        { blank: true },
-        { name: 'H', locked: true },
-        { name: 'CNOT', role: 'control', targetWire: 1, locked: true },
-      ],
-      [
-        null,
-        null,
-        { name: 'CNOT', role: 'target', controlWire: 0, locked: true },
-      ],
-    ],
-    // The blank at (wire 0, step 0) must be filled with X
-    answer: [{ wireIndex: 0, stepIndex: 0, gate: 'X' }],
-  },
-  {
-    id: 3,
-    title: 'Undo the Hidden Circuit',
-    description:
-      'A secret operation has been applied to the qubits inside the hidden block. Add gates after the block to revert the qubits exactly to the |00⟩ state. Watch the Amplitudes in the Results panel to figure it out!',
-    points: 20,
-    allowedGates: ['H', 'X', 'Y', 'Z', 'CNOT', 'CZ', 'TOFFOLI'],
-    hiddenBlocks: [{ topWire: 0, bottomWire: 1, startStep: 0, endStep: 1 }],
-    circuit: [
-      [
-        { name: 'H', locked: true },
-        { name: 'CNOT', role: 'control', targetWire: 1, locked: true },
-      ],
-      [
-        null,
-        { name: 'CNOT', role: 'target', controlWire: 0, locked: true },
-      ],
-    ],
-    answer: [
-      { wireIndex: 0, stepIndex: 2, gate: 'CNOT', role: 'control', targetWire: 1 },
-      { wireIndex: 1, stepIndex: 2, gate: 'CNOT', role: 'target', controlWire: 0 },
-      { wireIndex: 0, stepIndex: 3, gate: 'H' }
-    ]
-  },
-  {
-    id: 4,
-    title: 'Create a Bell State',
-    description: 'Create the entangled Bell state (|00⟩ + |11⟩)/√2 from the starting |00⟩ state. There are multiple correct ways to do this! (Hint: apply a Hadamard, then entangle them).',
-    points: 20,
-    allowedGates: ['H', 'X', 'Y', 'Z', 'CNOT', 'CZ'],
-    circuit: [
-      [null],
-      [null]
-    ],
-    answer: [
-      { wireIndex: 0, stepIndex: 0, gate: 'H' },
-      { wireIndex: 0, stepIndex: 1, gate: 'CNOT', role: 'control', targetWire: 1 },
-      { wireIndex: 1, stepIndex: 1, gate: 'CNOT', role: 'target', controlWire: 0 }
-    ]
-  }
-];
+import rawBackup from './questions.json';
+
+function parseBuilderBackup(questions) {
+  if (!Array.isArray(questions)) return [];
+  
+  return questions.map((q, i) => {
+    const id = q.id || i + 1;
+    
+    // 1. Trim trailing empty steps
+    let lastOcc = -1;
+    q.circuit.forEach(wire => {
+      for (let s = wire.length - 1; s >= 0; s--) {
+        if (wire[s] !== null) {
+          if (s > lastOcc) lastOcc = s;
+          break;
+        }
+      }
+    });
+    const trimSteps = Math.max(0, lastOcc + 1);
+
+    // 2. Format the circuit cells
+    const circuit = q.circuit.map(wire => 
+      wire.slice(0, trimSteps).map(cell => {
+        if (!cell) return null;
+        if (cell.blank) {
+          if (cell.name === 'BLANK_2' || cell.name === 'BLANK_3') return { ...cell, locked: true };
+          return { blank: true, name: 'BLANK' };
+        }
+        return { ...cell, locked: true };
+      })
+    );
+
+    const out = {
+      id, 
+      title: q.title || `Question ${id}`,
+      description: q.description, 
+      points: q.points,
+      allowedGates: q.allowedGates, 
+      circuit,
+    };
+    
+    if (q.restrictToBlanks) out.restrictToBlanks = true;
+    if (q.evaluationType) out.evaluationType = q.evaluationType;
+    if (q.targetState) out.targetState = q.targetState;
+    if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
+
+    // 3. Format the answer key
+    if (!q.restrictToBlanks) {
+      const answer = [];
+      (q.answerCircuit || []).forEach((wire, wi) => {
+        wire.forEach((cell, si) => {
+          if (!cell || cell.blank) return;
+          const item = { wireIndex: wi, stepIndex: si, gate: cell.name };
+          if (cell.role) {
+            item.role = cell.role;
+            if (cell.role === 'control') {
+              item.targetWire = cell.targetWire;
+              if (cell.controls) item.controls = cell.controls;
+            } else {
+              if (cell.controlWire != null) item.controlWire = cell.controlWire;
+              if (cell.controls)            item.controls     = cell.controls;
+              if (cell.targetWire != null)  item.targetWire   = cell.targetWire;
+            }
+          }
+          answer.push(item);
+        });
+      });
+      out.answer = answer;
+    } else {
+      out.answer = Object.entries(q.exactAnswer || {})
+        .filter(([, gate]) => gate)
+        .map(([key, gate]) => { 
+          const [w, s] = key.split('_').map(Number); 
+          return { wireIndex: w, stepIndex: s, gate }; 
+        })
+        .sort((a, b) => a.wireIndex - b.wireIndex || a.stepIndex - b.stepIndex);
+    }
+    
+    return out;
+  });
+}
+
+export const QUESTIONS = parseBuilderBackup(rawBackup);

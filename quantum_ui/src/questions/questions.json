@@ -1,0 +1,823 @@
+[
+  {
+    "id": 19,
+    "title": "Quantum Transformations",
+    "description": "We want to be able to transform one quantum state to another quantum state. Quantum **gates** are valid quantum state transformations that are given by unitary operations. \n\n\nLook at the probabilities, amplitudes, and histogram on the right. We start with each qubit (quantum bit) in the ground state $\\ket0$ with 100% probability. \nDrag and drop the $X$ gate to flip this to $\\ket1$!  ",
+    "points": 5,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "X"
+    ],
+    "nQubits": 1,
+    "nSteps": 0,
+    "circuit": [
+      []
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        {
+          "name": "X"
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 5,
+    "title": "X gate",
+    "description": "The $X$ gate you just saw transforms $$\\ket 0$$ into $$\\ket 1$$, and $$\\ket 1$$ into $$\\ket 0$$. It is thus the quantum equivalent of the NOT gate for classical computers.\n \nIt is represented as $$X = \\begin{bmatrix} 0 & 1 \\\\ 1 & 0 \\end{bmatrix} = \\ket0\\bra1 + \\ket1\\bra0$$\n\n\nDrag and drop the correct gates to transform the circuit to $\\ket{10}$",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "X"
+    ],
+    "nQubits": 2,
+    "nSteps": 1,
+    "circuit": [
+      [
+        {
+          "name": "BARRIER",
+          "topWire": 0,
+          "bottomWire": 0
+        }
+      ],
+      [
+        {
+          "name": "X"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        {
+          "name": "X"
+        }
+      ],
+      [
+        {
+          "name": "X"
+        }
+      ]
+    ],
+    "hiddenBlocks": [
+      {
+        "topWire": 0,
+        "bottomWire": 1,
+        "startStep": 0,
+        "endStep": 0
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "title": "Superposition",
+    "description": "The Hadamard gate can be used to put our $$Z$$ basis states ($\\ket0$ and $\\ket1$) into 50-50 superposition states ($$\\ket+= \\frac{\\ket0+\\ket1}{\\sqrt2}$$ and $\\ket- = \\frac{\\ket0-\\ket1}{\\sqrt2}$)!\n\nIt can be written as $$H = \\ket+\\bra0 + \\ket-\\bra1 =  \\begin{bmatrix} \\frac{1}{\\sqrt{2}} & \\frac{1}{\\sqrt{2}} \\\\ \\frac{1}{\\sqrt{2}} & \\frac{-1}{\\sqrt{2}} \\end{bmatrix}$$\n\n\nDrop a $H$ gate to transform $\\ket0$ into $\\ket+$!",
+    "points": 10,
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X"
+    ],
+    "nQubits": 1,
+    "nSteps": 1,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "H"
+    },
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 6,
+    "title": "Hadamard gate as change of basis",
+    "description": "We call $\\mathcal{B}_{Z} = \\{\\ket0, \\ket1\\}$ as the $Z$ basis, or our *computational basis*. \n$\\mathcal{B}_{X} = \\{\\ket+ = \\frac{\\ket0+\\ket1}{\\sqrt2}, \\ket-= \\frac{\\ket0-\\ket1}{\\sqrt2}\\}$ is the $X$ basis.\n\n\nWe've seen that the Hadamard gate transforms $\\ket0$ to $\\ket+$ and $\\ket1$ to $\\ket-$. It also transforms it back!\nWe can see this in its bra-ket notation: $H = \\bm{\\ket0\\bra+ + \\ket1\\bra-} = \\ket+\\bra0 + \\ket-\\bra1$\n\nWe thus say that the $H$ gate **changes the basis of the state** from $Z$ to $X$ and back again. \n\n\nIn the circuit below, notice the amplitudes and find the combination of X's and H's that transform the qubit to the $\\ket-$ state",
+    "points": 10,
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X"
+    ],
+    "nQubits": 1,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "X",
+      "0_1": "H"
+    },
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 21,
+    "title": "Measurement",
+    "description": "When we measure one or more qubits, we convert qubit amplitudes to classical probabilities. Measuring a quantum system causes it to collapse to a definite state. By default, we measure in the $Z$ basis.\n\nPut the below qubit in a 50-50 superposition state and measure it to see its classical probabilities!",
+    "points": 10,
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "MEASURE",
+      "H"
+    ],
+    "nQubits": 1,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "H",
+      "0_1": "MEASURE"
+    },
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 15,
+    "title": "Measure in +/- basis",
+    "description": "While we measure in the $Z$ basis by default, we might want to measure in a different basis. In such a case, we'd want our orthonormal basis vectors to map to 0 and 1 on measurement. For example, if we were to measure in the $X$ basis ($+/-$), we'd want to measure $\\ket+$ as outcome 0 and $\\ket-$ as outcome 1.\n\n\nWe saw that the Hadamard gate **changes the basis of the state** from $$Z$$ to $$X$$ and back again. \n$$H = \\ket0\\bra+ + \\ket1\\bra-  = \\ket+\\bra0 + \\ket-\\bra1$$\n\n\nThe hidden blocks construct some state $$\\ket{\\psi}$$. Use the single qubit gates and the measurement gate to measure in the $$+/-$$ basis. ",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "Z",
+      "MEASURE",
+      "X"
+    ],
+    "nQubits": 1,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "T"
+        },
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 2,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "hiddenBlocks": [
+      {
+        "topWire": 0,
+        "bottomWire": 0,
+        "startStep": 0,
+        "endStep": 2
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Creating the X gate using phase flip ",
+    "description": "The $Z$ gate is represented by $$Z = \\begin{bmatrix} 1 & 0 \\\\ 0 & -1\\end{bmatrix} = \\ket0\\bra0 - \\ket1\\bra1$$ and is called the \"phase flip\" since it maps $\\ket1$ to $-\\ket1$.\n\nWriting out the $X$ and $Z$ gates in bra-ket notation in both the $0/1$ & $+/-$ basis shows us some similarities:\n$$X = \\quad\\ket+\\bra+ - \\ket-\\bra- \\quad=\\quad \\ket0\\bra1 + \\ket1\\bra0$$\n$$Z = \\quad\\ket0\\bra0 - \\ket1\\bra1 \\quad= \\quad\\ket+\\bra- + \\ket-\\bra+$$\n\nThey have the same effect in a different basis. $Z$ flips the $+/-$ states.\n\n\nUsing this, can you construct an $X$ gate with only the given gates?",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "Z",
+      "T",
+      "MEASURE"
+    ],
+    "nQubits": 1,
+    "nSteps": 0,
+    "circuit": [
+      []
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 3,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "Z"
+        },
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 9,
+    "title": "T gate",
+    "description": "Any valid unitary operation (operation possible on a quantum computer) can be expressed as a finite sequence of gates from a **universal set of quantum gates**. One such universal set is {CX, H, T} (we will see CX soon).\n\n$T$ gate is given by $$T = \\begin{bmatrix} 1 & 0 \\\\ 0 & e^{i\\frac{\\pi}{4}}\\end{bmatrix} = \\sqrt[4]{Z}$$\n\nThe $S$ gate is $S = \\sqrt{Z}$ i.e, $SS = Z$.  Construct the equivalent of an $S$ gate in the circuit below.",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "T"
+    ],
+    "nQubits": 1,
+    "nSteps": 1,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 2,
+    "answerCircuit": [
+      [
+        {
+          "name": "T"
+        },
+        {
+          "name": "T"
+        }
+      ]
+    ],
+    "hiddenBlocks": [
+      {
+        "topWire": 0,
+        "bottomWire": 0,
+        "startStep": 0,
+        "endStep": 0
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "title": "Relative & Global Phase",
+    "description": "In quantum mechanics, a state $e^{i\\theta}\\ket{\\psi}$ is said to have a **global phase** $\\theta$. Global phases are physically irrelevant. \nHowever, given a state $\\ket{\\psi} = \\ket0 + e^{i\\phi}\\ket1$, we have a **relative phase** $\\phi$, which is physically relevant.\n\n\nWe have $$Y = i\\ket0\\bra1 - i\\ket1\\bra0 = \\ket{+i}\\bra{-i} + \\ket{-i}\\bra{+i}$$, which flips the state over the Y axis. \nTo get back to the $\\ket0$ state in the given circuit, the missing gate must flip both the $0/1$ components (similar to the $X$ gate) and also add a relative phase between the two components (similar to the $Z$ gate). Find the singular gate that accomplishes this.",
+    "points": 10,
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "Y",
+      "Z",
+      "T",
+      "X",
+      "H"
+    ],
+    "nQubits": 1,
+    "nSteps": 6,
+    "circuit": [
+      [
+        {
+          "name": "X"
+        },
+        {
+          "name": "H"
+        },
+        {
+          "name": "T"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "name": "T"
+        },
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_3": "Y"
+    },
+    "answerNQubits": 1,
+    "answerNSteps": 2,
+    "answerCircuit": [
+      [
+        {
+          "name": "Y"
+        },
+        {
+          "name": "Z"
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 10,
+    "title": "2 qubit gates",
+    "description": "We need qubits to interact to do meaningful computation. We use 2 qubit gates for such scenarios. The most commonly noted one is the $CX$ (also known as $CNOT$) gate.\n\nCX applies the X gate on\u000bthe target qubit\u000bdepending on the\u000bstate of the control qubit. \nIt's given by $$CX_{c=0,t=1} = \\begin{bmatrix} \n1 & 0 & 0 & 0 \\\\\n0 & 1 & 0 & 0 \\\\\n0 & 0 & 0 & 1 \\\\\n0 & 0 & 1 & 0 \n\\end{bmatrix} = \n\\ket{00}\\bra{00} + \\ket{01}\\bra{01} + \\ket{\\textbf{10}}\\bra{\\textbf{11}} + \\ket{\\textbf{11}}\\bra{\\textbf{10}}$$\n\n\nMake the resulting circuit $$\\ket{11}$$",
+    "points": 10,
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "CNOT"
+    ],
+    "nQubits": 2,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "name": "BLANK_2",
+          "role": "control",
+          "targetWire": 1,
+          "blank": true
+        }
+      ],
+      [
+        null,
+        {
+          "name": "BLANK_2",
+          "role": "target",
+          "controlWire": 0,
+          "blank": true
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "X",
+      "0_1": "CNOT"
+    },
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 11,
+    "title": "Entanglement",
+    "description": "We've seen that $$CX_{0,1}\\ket{00} = \\ket{00}$$ and $$CX_{0,1}\\ket{10} = \\ket{11}$$\nLet's try to create entangled bell state $$\\ket{\\Phi^+} = \\dfrac{\\ket{00} +\\ket{11}}{\\sqrt{2}}$$!\n\n\nHint: how do we get to $\\frac{\\ket{0}\\ket{0} +\\ket{1}\\ket{0}}{\\sqrt{2}}$? How would we transform that to $\\ket{\\Phi^+}$",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "CNOT",
+      "CZ"
+    ],
+    "nQubits": 2,
+    "nSteps": 0,
+    "circuit": [
+      [],
+      []
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 2,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        }
+      ],
+      [
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 22,
+    "title": "Entanglement with CZ",
+    "description": "Controlled-X isn't the only way to create entanglement! You can also control a Z (phase) operation to accomplish the same thing. Show that three Hadamards and a CZ can be used to create the $\\dfrac{\\ket{00} + \\ket{11}}{\\sqrt{2}}$ entangled state",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "CZ"
+    ],
+    "nQubits": 2,
+    "nSteps": 0,
+    "circuit": [
+      [],
+      []
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 3,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CZ",
+          "role": "control",
+          "targetWire": 1
+        },
+        null
+      ],
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CZ",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 17,
+    "title": "Measuring entanglement in the X basis",
+    "description": "Consider $$\\ket{\\Psi^-} = \\frac{\\ket{01} -\\ket{10}}{\\sqrt{2}}$$ constructed below.\nMeasure this circuit in the $X$ ($+/-$) basis. \n\n\nDo you see entanglement even when it's measured in a different basis? Can you think of how you can re-write $\\ket{\\Psi^-}$ using $\\ket+$ and $\\ket-$?",
+    "points": 10,
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 2,
+    "nSteps": 5,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "Z"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ],
+      [
+        {
+          "name": "X"
+        },
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_3": "H",
+      "1_3": "H"
+    },
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 18,
+    "title": "Reversible circuits",
+    "description": "Observing the amplitudes of the circuit, try to reverse the circuit to obtain $\\ket{00}$\n\nHint: does applying $CX$ twice affect the circuit?",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "CNOT",
+      "T"
+    ],
+    "nQubits": 2,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        }
+      ],
+      [
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 2,
+    "answerCircuit": [
+      [
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        },
+        {
+          "name": "H"
+        }
+      ],
+      [
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        },
+        null
+      ]
+    ],
+    "hiddenBlocks": [
+      {
+        "topWire": 0,
+        "bottomWire": 1,
+        "startStep": 0,
+        "endStep": 1
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "title": "Entangling 3 qubits",
+    "description": "The GHZ state is an entangled quantum state for 3 qubits. $\\ket{GHZ} = \\dfrac{\\ket{000} + \\ket{111}}{\\sqrt{2}}$\nConstruct it!\n\n\nHint: $\\ket{\\Phi^+} \\otimes \\ket{0} = \\frac{\\ket{000} + \\ket{110}}{\\sqrt{2}}$. How do we get to $\\ket{GHZ}$ from here?",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "CNOT",
+      "CZ"
+    ],
+    "nQubits": 3,
+    "nSteps": 0,
+    "circuit": [
+      [],
+      [],
+      []
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 3,
+    "answerNSteps": 3,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        },
+        null
+      ],
+      [
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 2
+        }
+      ],
+      [
+        null,
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 1
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 16,
+    "title": "Toffoli gate",
+    "description": "We can have multi-qubit gates beyond 2-qubit gates. One example is the Toffoli gate, or the controlled-controlled-X (CCX) gate. It has 2 control qubits and 1 target qubit, which is flipped if **both** control qubits are 1. \nGiven the circuit below, construct $\\ket{GHZ} = \\dfrac{\\ket{000} + \\ket{111}}{\\sqrt{2}}$ using the Toffoli gate.",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "TOFFOLI"
+    ],
+    "nQubits": 3,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 2
+        }
+      ],
+      [
+        null,
+        null
+      ],
+      [
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 3,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        {
+          "name": "TOFFOLI",
+          "role": "control",
+          "controls": [
+            2,
+            0
+          ],
+          "targetWire": 1
+        }
+      ],
+      [
+        {
+          "name": "TOFFOLI",
+          "role": "target",
+          "controls": [
+            2,
+            0
+          ],
+          "targetWire": 1
+        }
+      ],
+      [
+        {
+          "name": "TOFFOLI",
+          "role": "control",
+          "controls": [
+            2,
+            0
+          ],
+          "targetWire": 1
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  },
+  {
+    "id": 13,
+    "title": "Expectation Values",
+    "description": "The expectation value is the average value you would measure if you repeated an experiment many times. Binary (or ±1) quantum observables can be built in any basis by assigning each of our orthonormal states to the values of $+1$ or $-1$. For example, we \nFor a single qubit state $\\ket{\\psi}$, $\\langle A\\rangle = \\bra{\\psi}A\\ket{\\psi}$. \n\n\nYou can see the expectation values $\\langle X\\rangle, \\langle Y\\rangle, \\langle Z\\rangle$ of a qubit in the simulator by clicking on its label $q[n]$.\n\nUsing only the Hadamard and T gates, manipulate the state such that $\\langle Y\\rangle= 1$",
+    "points": 10,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "T"
+    ],
+    "nQubits": 1,
+    "nSteps": 0,
+    "circuit": [
+      []
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 3,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "T"
+        },
+        {
+          "name": "T"
+        }
+      ]
+    ],
+    "hiddenBlocks": []
+  }
+]
