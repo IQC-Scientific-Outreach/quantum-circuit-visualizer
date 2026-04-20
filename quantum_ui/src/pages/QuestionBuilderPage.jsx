@@ -50,6 +50,7 @@ function newQuestion(id = 1) {
     answerNQubits: 1, answerNSteps: 1,
     answerCircuit: makeGrid(1, 1),
     hiddenBlocks: [],
+    explanation: '',
   };
 }
 
@@ -196,6 +197,7 @@ function serializeQuestion(q, id) {
       .sort((a, b) => a.wireIndex - b.wireIndex || a.stepIndex - b.stepIndex);
   }
   if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
+  if (q.explanation) out.explanation = q.explanation;
   return out;
 }
 
@@ -796,6 +798,26 @@ function QuestionEditor({ question: q, onChange }) {
             </div>
           </div>
         )}
+
+        {/* Answer Explanation */}
+        <div className="mt-4 pt-4 border-t border-slate-700/50">
+          <label className={labelCls}>Answer Explanation (optional)</label>
+          <textarea value={q.explanation || ''} onChange={e => update({ explanation: e.target.value })}
+            rows={2} placeholder="Explain the answer here. Shown to students after they solve or reveal the question."
+            className={inputCls + ' resize-none'} />
+          {q.explanation && (
+            <div className="mt-2 p-3 bg-slate-950/50 rounded-lg border border-slate-700/50 text-sm text-slate-400">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1">Preview</p>
+              <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={{ p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} /> }}
+              >
+                {q.explanation.replace(/\n{3,}/g, match => '\n\n' + '&nbsp;\n\n'.repeat(match.length - 2))}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── Hidden Blocks (advanced) ────────────────────────────────────────── */}

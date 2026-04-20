@@ -713,7 +713,6 @@ export default function QuestionsPage() {
     if (answerRevealed) { advanceQuestion(0); return; }
     if (checkCorrect()) {
       setFeedback('correct');
-      setTimeout(() => advanceQuestion(question.points), 1400);
     } else {
       setFeedback('incorrect');
     }
@@ -869,7 +868,8 @@ export default function QuestionsPage() {
           </div>
 
           {/* Controls + feedback */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
             {questionIndex > 0 && (
               <button
                 onClick={() => setQuestionIndex(qi => qi - 1)}
@@ -914,24 +914,35 @@ export default function QuestionsPage() {
               </>
             ) : (
               <>
-                <button
-                  onClick={handleSubmit}
-                  disabled={feedback === 'correct'}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
-                >
-                  Submit
-                </button>
-                <button
-                  onClick={handleGetAnswer}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-sm font-semibold rounded-lg transition-colors"
-                >
-                  Get Answer (0 pts)
-                </button>
+                {feedback !== 'correct' && (
+                  <>
+                    <button
+                      onClick={handleSubmit}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                      Submit
+                    </button>
+                    <button
+                      onClick={handleGetAnswer}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-sm font-semibold rounded-lg transition-colors"
+                    >
+                      Get Answer (0 pts)
+                    </button>
+                  </>
+                )}
 
                 {feedback === 'correct' && (
-                  <div className="text-sm text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-lg px-3 py-1.5 animate-pulse">
-                    ✓ Correct! +{question.points} points — moving on…
-                  </div>
+                  <>
+                    <div className="text-sm text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-lg px-3 py-1.5">
+                      ✓ Correct! +{question.points} points
+                    </div>
+                    <button
+                      onClick={() => advanceQuestion(question.points)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                      {questionIndex + 1 < activeQuestions.length ? 'Next Question →' : 'Finish →'}
+                    </button>
+                  </>
                 )}
                 {feedback === 'incorrect' && (
                   <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-1.5">
@@ -948,6 +959,20 @@ export default function QuestionsPage() {
               >
                 {hiddenCircuitRevealed ? 'Hide Hidden Circuit' : 'Reveal Hidden Circuit'}
               </button>
+            )}
+            </div>
+
+            {(questionIndex < scores.length || answerRevealed || feedback === 'correct') && question.explanation && (
+              <div className="bg-slate-800/80 border border-slate-600/50 rounded-xl p-4 text-sm text-slate-300 mt-2">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Explanation</p>
+                <ReactMarkdown
+                  remarkPlugins={[remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                  components={{ p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} /> }}
+                >
+                  {question.explanation.replace(/\n{3,}/g, match => '\n\n' + '&nbsp;\n\n'.repeat(match.length - 2))}
+                </ReactMarkdown>
+              </div>
             )}
           </div>
         </div>

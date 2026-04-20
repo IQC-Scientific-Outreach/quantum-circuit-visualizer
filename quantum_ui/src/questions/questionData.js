@@ -67,6 +67,7 @@ function parseBuilderBackup(questions) {
     if (q.evaluationType) out.evaluationType = q.evaluationType;
     if (q.targetState) out.targetState = q.targetState;
     if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
+    if (q.explanation) out.explanation = q.explanation;
 
     // 3. Format the answer key
     if (!q.restrictToBlanks) {
