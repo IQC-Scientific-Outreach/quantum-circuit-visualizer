@@ -310,6 +310,7 @@ export default function QuestionsPage() {
   const [circuitState,    setCircuitState]    = useState(() => initCircuit(question));
   const [feedback,        setFeedback]        = useState(null);
   const [answerRevealed,  setAnswerRevealed]  = useState(false);
+  const [hiddenCircuitRevealed, setHiddenCircuitRevealed] = useState(false);
 
   const [engine,   setEngine]   = useState(null);
   const [isReady,  setIsReady]  = useState(false);
@@ -327,6 +328,7 @@ export default function QuestionsPage() {
     setCircuitState(initCircuit(qs[0]));
     setFeedback(null);
     setAnswerRevealed(false);
+    setHiddenCircuitRevealed(false);
   }
 
   // ── Load .qpkg file ─────────────────────────────────────────────────────────
@@ -377,11 +379,13 @@ export default function QuestionsPage() {
       setCircuitState(getAnswerCircuit(question));
       setFeedback(scores[questionIndex].points > 0 ? 'correct' : null);
       setAnswerRevealed(true);
+      setHiddenCircuitRevealed(false);
     } else {
       // We are looking at a fresh question
       setCircuitState(initCircuit(question));
       setFeedback(null);
       setAnswerRevealed(false);
+      setHiddenCircuitRevealed(false);
     }
     setSelectedQubit(null);
     setHoveredBarrier(null);
@@ -852,7 +856,7 @@ export default function QuestionsPage() {
           <div className="overflow-auto">
             <QuestionCircuit
               circuitState={circuitState}
-              hiddenBlocks={question.hiddenBlocks}
+              hiddenBlocks={hiddenCircuitRevealed ? [] : question.hiddenBlocks}
               restrictToBlanks={question.restrictToBlanks}
               onDelete={deleteGate}
               separatorStep={separatorStep}
@@ -935,6 +939,15 @@ export default function QuestionsPage() {
                   </div>
                 )}
               </>
+            )}
+
+            {(questionIndex < scores.length || answerRevealed) && question.hiddenBlocks?.length > 0 && (
+              <button
+                onClick={() => setHiddenCircuitRevealed(prev => !prev)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-sm font-semibold rounded-lg transition-colors ml-auto"
+              >
+                {hiddenCircuitRevealed ? 'Hide Hidden Circuit' : 'Reveal Hidden Circuit'}
+              </button>
             )}
           </div>
         </div>
