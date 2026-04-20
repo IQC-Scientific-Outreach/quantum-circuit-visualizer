@@ -24,7 +24,7 @@
       ]
     ],
     "hiddenBlocks": [],
-    "explanation": ""
+    "explanation": "$X$ gate is the quantum equivalent of the NOT gate for classical computers with respect to the standard basis $\\ket0, \\ket1$. It flips $\\ket0$ to $\\ket1$, and $\\ket1$ to $\\ket0$."
   },
   {
     "id": 5,
@@ -74,7 +74,7 @@
         "endStep": 0
       }
     ],
-    "explanation": ""
+    "explanation": "Note that the $X$ gate are *involutory*, which means that applying them twice effectively does nothing! You'll notice this later in many of our other gates as well."
   },
   {
     "id": 20,
@@ -106,7 +106,8 @@
         null
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "We can see how this works using both the bra-ket notation and the matrix form!\n$H = \\ket+\\bra0 + \\ket-\\bra1$, which means it maps $\\ket0$ to $\\ket+$ and $\\ket1$ to $\\ket-$. \nAlso, $H\\ket0 =  \n\\begin{bmatrix} \\frac{1}{\\sqrt{2}} & \\frac{1}{\\sqrt{2}} \n\\\\ \\frac{1}{\\sqrt{2}} & \\frac{-1}{\\sqrt{2}} \\end{bmatrix}\n\\begin{bmatrix}1 \\\\ 0\\end{bmatrix}\n= \\begin{bmatrix}\\frac{1}{\\sqrt{2}} \\\\ \\frac{1}{\\sqrt{2}} \\end{bmatrix}$\n"
   },
   {
     "id": 6,
@@ -145,7 +146,8 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "We saw $H = \\ket+\\bra0 + \\ket-\\bra1$, which means it maps $\\ket0$ to $\\ket+$ and $\\ket1$ to $\\ket-$. \nTo get $\\ket-$, we can map $\\ket0$ to $\\ket1$ using the $X$ gate, and map $\\ket1$ to $\\ket-$ using the $H$ gate.\n\n\nAlso, $HX\\ket0 =  \n \\frac{1}{\\sqrt{2}} \\begin{bmatrix} 1 & 1\n\\\\1 & -1 \\end{bmatrix}\n\\begin{bmatrix} 0 & 1\n\\\\1 & 0 \\end{bmatrix}\n\\begin{bmatrix}1 \\\\ 0\\end{bmatrix}\n=  \\frac{1}{\\sqrt{2}} \\begin{bmatrix} 1 & 1\n\\\\1 & -1 \\end{bmatrix}\\begin{bmatrix}0 \\\\ 1\\end{bmatrix}\n= \\begin{bmatrix}\\frac{1}{\\sqrt{2}} \\\\ \\frac{-1}{\\sqrt{2}} \\end{bmatrix}\n= \\ket-$"
   },
   {
     "id": 21,
@@ -184,7 +186,8 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "$H$ puts $\\ket0$ into the 50-50 superposition state $\\ket+ = \\frac{1}{\\sqrt{2}}\\ket0 + \\frac{1}{\\sqrt{2}}\\ket1$. We measure it to see the probability of measuring 0 or 1 when it is forced to collapse in the computational ($Z$) basis."
   },
   {
     "id": 15,
@@ -233,7 +236,8 @@
         "startStep": 0,
         "endStep": 2
       }
-    ]
+    ],
+    "explanation": "For a state $\\ket{\\psi} = \\alpha\\ket+ + \\beta\\ket-$, $H\\ket{\\psi} = \\alpha\\ket0 + \\beta\\ket1$. \nMeasuring $H\\ket{\\psi}$ in the computation basis has a $|\\alpha|^2$ probability of collapsing to $0$ and a $|\\beta|^2$ probability of collapsing to $1$. \nThus, if we want to measure $\\ket{\\psi}$ in the $+/-$ basis, we can apply $H$ before measurement, to measure $\\ket+$ as outcome $0$ and $\\ket-$ as outcome $1$.\n\n"
   },
   {
     "id": 7,
@@ -274,7 +278,7 @@
   {
     "id": 9,
     "title": "T gate",
-    "description": "Any valid unitary operation (operation possible on a quantum computer) can be expressed as a finite sequence of gates from a **universal set of quantum gates**. One such universal set is {CX, H, T} (we will see CX soon).\n\n$T$ gate is given by $$T = \\begin{bmatrix} 1 & 0 \\\\ 0 & e^{i\\frac{\\pi}{4}}\\end{bmatrix} = \\sqrt[4]{Z}$$\n\nThe $S$ gate is $S = \\sqrt{Z}$ i.e, $SS = Z$.  Construct the equivalent of an $S$ gate in the circuit below.",
+    "description": "Any valid unitary operation (operation possible on a quantum computer) can be expressed as a finite sequence of gates from a **universal set of quantum gates**. One such universal set is {CX, H, T} (we will see CX soon).\n\n$T$ gate is given by $$T = \\begin{bmatrix} 1 & 0 \\\\ 0 & e^{i\\frac{\\pi}{4}}\\end{bmatrix} = \\sqrt[4]{Z}$$\nAlso, $T = \\ket0\\bra0 + e^{i\\frac{\\pi}{4}}\\ket1\\bra1$\n\nThe $S$ gate is $S = \\sqrt{Z}$ i.e, $SS = Z$.  Construct the equivalent of an $S$ gate in the circuit below.",
     "points": 10,
     "restrictToBlanks": false,
     "allowedGates": [
@@ -313,7 +317,8 @@
         "startStep": 0,
         "endStep": 0
       }
-    ]
+    ],
+    "explanation": "$T = \\sqrt[4]{Z}$\n$TT = \\sqrt[4]{Z}\\sqrt[4]{Z} = \\sqrt{Z} = S$"
   },
   {
     "id": 8,
@@ -368,12 +373,13 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "The question states that the missing gate must flip both the $0/1$ components (similar to the $X$ gate) and also add a relative phase between the two components (similar to the $Z$ gate). \nThis would be possibly by $ZX$, but we need a singular gate to do this.\nWe are given $Y = iZX$, which is equal to $ZX$ up to a global phase. Global phases are physically irrelevant, and so $Y$ is our answer!"
   },
   {
     "id": 13,
     "title": "Expectation Values",
-    "description": "The expectation value is the average value you would measure if you repeated an experiment many times. Binary (or ±1) quantum observables can be built in any basis by assigning each of our orthonormal states to the values of $+1$ or $-1$. For example, we \nFor a single qubit state $\\ket{\\psi}$, $\\langle A\\rangle = \\bra{\\psi}A\\ket{\\psi}$. \n\n\nYou can see the expectation values $\\langle X\\rangle, \\langle Y\\rangle, \\langle Z\\rangle$ of a qubit in the simulator by clicking on its label $q[n]$.\n\nUsing only the Hadamard and T gates, manipulate the state such that $\\langle Y\\rangle= 1$",
+    "description": "The expectation value is the average value you would measure if you repeated an experiment many times. Binary (or ±1) quantum observables can be built in any basis by assigning each of our orthonormal states to the values of $+1$ or $-1$. For example, we \nFor a single qubit state $\\ket{\\psi}$, $\\langle A\\rangle = \\bra{\\psi}A\\ket{\\psi}$. \n\n\nYou can see the expectation values $\\langle X\\rangle, \\langle Y\\rangle, \\langle Z\\rangle$ of a qubit in the simulator by clicking on its label $q[n]$.\n\nUsing only the Hadamard and T gates, manipulate the state such that $\\langle Y\\rangle= 1$.\n\n\nHelpful to remember: \n$Y$ has eigenvectors $\\ket{+i} = \\frac{\\ket0+i\\ket1}{\\sqrt{2}}, \\ket{-i} = \\frac{\\ket0-i\\ket1}{\\sqrt{2}}$ with eigenvalues $+1, -1$\n$T = \\ket0\\bra0 + e^{i\\frac{\\pi}{4}}\\ket1\\bra1$ so $T^n = \\ket0\\bra0 + e^{i\\frac{\\pi}{4}\\cdot n}\\ket1\\bra1$",
     "points": 10,
     "restrictToBlanks": false,
     "allowedGates": [
@@ -401,7 +407,8 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "To get $\\langle Y\\rangle= 1$, we need to make our state be at a 100% probability of measuring the orthonormal state that has the eigenvalue $+1$, which is $\\ket{+i}= \\frac{\\ket0+i\\ket1}{\\sqrt{2}}$. \nWe can do this by first obtaining $H\\ket0 = \\ket+ = \\frac{\\ket0+\\ket1}{\\sqrt{2}}$\nThen applying $T$ gate twice: \n$TH\\ket0 =  \\frac{\\ket0+e^{i\\pi/4}\\ket1}{\\sqrt{2}}$\n$TTH\\ket0 =  \\frac{\\ket0+e^{i\\frac{\\pi}{4}\\cdot 2}\\ket1}{\\sqrt{2}}  =  \\frac{\\ket0+i\\ket1}{\\sqrt{2}} = \\ket{+i}$"
   },
   {
     "id": 10,
@@ -455,7 +462,8 @@
         null
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "$X\\ket{00} = \\ket{10}$\n$CX_{0,1}\\ket{00} = \\ket{11}$"
   },
   {
     "id": 11,
@@ -500,7 +508,8 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "We can do entanglement in just 2 gates!\nWe can get $\\frac{\\ket{0}\\ket{0} +\\ket{1}\\ket{0}}{\\sqrt{2}} = \\ket+ \\otimes \\ket0$ by putting just the first qubit into $\\ket+$.\nWe can make $\\frac{\\ket{00} + \\ket{11}}{\\sqrt2}$ from $\\frac{\\ket{00} + \\ket{10}}{\\sqrt2} = \\ket+ \\otimes \\ket0$ simply by applying $CX_{0,1}$!\n\n\n$CX_{0,1}\\frac{\\ket{00} + \\ket{10}}{\\sqrt2} = \\frac{CX_{0,1}\\ket{00} + CX_{0,1}\\ket{10}}{\\sqrt2} = \\frac{\\ket{00} + \\ket{11}}{\\sqrt2} = \\ket{\\Phi^+}$\n\n\nA helpful way to come up with a solution would be to try reverse-engineering the bell state to see how you can get back $\\ket{00}$."
   },
   {
     "id": 22,
@@ -547,7 +556,8 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "We've seen that $HZH = X$ and $HH = I$ (identity matrix i.e, does nothing).\nThus, we can use our $CZ$ and $H$s to make a $CX$ gate (and thus, the entangled $\\frac{\\ket{00} + \\ket{11}}{\\sqrt{2}}$ state)!"
   },
   {
     "id": 17,
@@ -617,7 +627,8 @@
         null
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "We know that we can add a $H$ gate before measurement to measure in the $+/-$ basis. Despite changing the basis of measurement, did you notice that our qubits are still entangled?"
   },
   {
     "id": 18,
@@ -685,7 +696,8 @@
         "startStep": 0,
         "endStep": 1
       }
-    ]
+    ],
+    "explanation": "Notice how applying $CX_{0,1}$ twice reverses it, and the same goes for $H$!"
   },
   {
     "id": 12,
@@ -746,7 +758,8 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "First, we constructed $\\ket{\\Phi^+} \\otimes \\ket{0} = \\frac{\\ket{000} + \\ket{110}}{\\sqrt{2}}$ as we've previously seen, with a $H$ and a $CX$. \nTo get $\\ket{GHZ} = \\frac{\\ket{000} + \\ket{111}}{\\sqrt{2}}$, we can either apply $CX_{0,2}$ or $CX_{1,2}$!\n\n\n$CX_{0,2} \\frac{\\ket{000} + \\ket{110}}{\\sqrt{2}} \n= \\frac{CX_{0,2}\\ket{000} + CX_{0,2}\\ket{110}}{\\sqrt{2}}\n=  \\frac{\\ket{000} + \\ket{111}}{\\sqrt{2}} = \\ket{GHZ}$\n$CX_{1,2} \\frac{\\ket{000} + \\ket{110}}{\\sqrt{2}} \n= \\frac{CX_{1,2}\\ket{000} + CX_{1,2}\\ket{110}}{\\sqrt{2}}\n=  \\frac{\\ket{000} + \\ket{111}}{\\sqrt{2}} = \\ket{GHZ}$"
   },
   {
     "id": 16,
@@ -821,6 +834,7 @@
         }
       ]
     ],
-    "hiddenBlocks": []
+    "hiddenBlocks": [],
+    "explanation": "The given circuit is $\\frac{\\ket{000} + \\ket{101}}{\\sqrt{2}}$\n\nTo get $\\ket{GHZ} = \\frac{\\ket{000} + \\ket{111}}{\\sqrt{2}}$ with a Toffoli gate, we need to have the controls on qubits 0 and 2, and the target on qubit 1\n\n$CCX_{\\{0,2\\},1} \\frac{\\ket{000} + \\ket{101}}{\\sqrt{2}} \n= \\frac{CCX_{\\{0,2\\},1}\\ket{000} + CCX_{\\{0,2\\},1}\\ket{101}}{\\sqrt{2}}\n=  \\frac{\\ket{000} + \\ket{111}}{\\sqrt{2}} = \\ket{GHZ}$"
   }
 ]
