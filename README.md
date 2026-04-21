@@ -17,6 +17,7 @@ It also doubles as an educational tool.
 - **Statevector panel** showing complex amplitudes for all basis states
 - **Measurement histogram** with configurable shot count to observe sampling statistics
 - **Single-qubit state tomography** by clicking any qubit label (e.g. `q[0]`) to display ⟨X⟩, ⟨Y⟩, ⟨Z⟩ Pauli expectation values in the results panel
+- **Circuit Code** that can generate the circuit without dragging and dropping. Useful to copy and paste to re-obtain a circuit.
 - **Built-in guided questions** that double as a step-by-step learning guide, no file needed
 - **Quiz mode** for loading teacher-created `.qpkg` question sets with blanks, hidden circuit regions, and per-question explanations
 - **Question Builder** for teachers to create, export, and share custom quizzes
