@@ -2,11 +2,13 @@
 
 **Website:** https://quantum-circuit-visualizer-steel.vercel.app/
 
-A browser-based quantum circuit visualizer and simulator! 
+A browser-based drag-and-drop quantum circuit visualizer & simulator! 
 
-No installation required! The visualizer supports drag-and-drop circuit building with timesteps, full statevector inspection, shot-based measurement histograms, single-qubit state tomography via Pauli expectation values, and complex circuit features including multi-qubit gates, barriers, and classical feed-forward. 
+No installation required! The visualizer supports **drag-and-drop circuit building** with timesteps, full statevector inspection, shot-based measurement histograms, single-qubit state tomography, and complex circuit features including multi-qubit gates, barriers, and classical feed-forward. 
 
-It also doubles as an educational tool. A built-in set of guided questions covers gates, superposition, entanglement, measurement, and feed-forward, and serves as an interactive walkthrough for learning quantum computing from the ground up. For teachers, a full question builder allows creating custom circuit questions with blanks, hidden blocks, and auto-grading, which can be exported and sent to students as a single file.
+It also doubles as an educational tool. 
+- A **built-in set of guided questions** covers gates, superposition, entanglement, measurement, and feed-forward, and serves as an interactive walkthrough for learning quantum computing from the ground up. 
+- For teachers, a **full question builder** allows creating custom circuit questions with blanks, hidden blocks, and auto-grading, which can be exported and sent to students as a single file.
 
 ---
 
@@ -27,9 +29,11 @@ It also doubles as an educational tool. A built-in set of guided questions cover
 
 ### Getting Started
 
-Open the app in a browser. The free-form **Circuit Builder** is on the home page: drag gates from the left palette onto the grid, hit **Run**, and inspect the results. No account or setup needed.
+Open the app in a browser. The free-form **Circuit Builder** is on the home page: drag gates from the left palette onto the grid and inspect the results. You can change number of shots, refresh the runs, and find the probabilities and amplitudes associated with your quantum state. Copy the generated circuit code to recreate your circuit at any time!
 
-The **Questions** tab loads a set of 23 built-in questions that progressively introduce quantum concepts. These work as both a tutorial and a practice set.
+The **Learn with Circuits** tab loads a set of built-in questions that progressively introduce quantum concepts. These work as both a tutorial and a practice set.
+
+Teachers can use the **Question Builder** to create custom quizes with significant customization options to design questions, and send it to students.
 
 ---
 
@@ -45,7 +49,7 @@ After running a circuit, the results panel on the left shows:
 
 **Expectation values per qubit:** Click a qubit label on the left side of the circuit (e.g. `q[0]`, `q[1]`) to show the Pauli expectation values ⟨X⟩, ⟨Y⟩, ⟨Z⟩ for that qubit in the results panel. This is useful for reading out the qubit state in different measurement bases, and effectively gives a single-qubit state tomography readout.
 
-**Amplitudes and counts** always appear together: amplitudes show the exact statevector entries, and counts show a sampled histogram (default 100 shots) to illustrate measurement statistics.
+**Amplitudes and counts**: amplitudes show the exact statevector entries, and counts show a sampled histogram (default 100 shots) to illustrate measurement statistics.
 
 **Timestep-by-timestep state:** Use barriers to visually separate circuit stages. The simulation runs the full circuit as built; to inspect the intermediate state at a given point, place a measurement gate at that timestep. The statevector and probabilities always reflect the full circuit as built.
 
@@ -102,9 +106,9 @@ After running a circuit, the results panel on the left shows:
 
 ---
 
-## Hosting on Vercel
+## Custom Hosting on Vercel
 
-You can deploy your own instance in a few minutes.
+You can deploy your own instance in a few minutes. This is an option for teachers who (1) want their quiz to be the default, (2) make changes/ add features, **and/or** (3) if they want to host the code themselves.
 
 ### Steps
 
