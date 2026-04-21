@@ -188,7 +188,7 @@ function FinalScreen({ scores, questions, onRetry }) {
   const pct = maxPoints > 0 ? Math.round((totalPoints / maxPoints) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 w-full bg-slate-950 text-slate-300 flex flex-col items-center justify-center font-sans gap-6 p-8">
+    <div className="fixed inset-0 w-full bg-slate-950 text-slate-300 flex flex-col items-center justify-center font-sans gap-6 p-8 overflow-y-auto">
       <div className="text-5xl">{pct === 100 ? '🏆' : pct >= 50 ? '🎉' : '💡'}</div>
       <h1 className="text-2xl font-bold text-white">Quiz Complete!</h1>
       <p className="text-base text-slate-400">
@@ -814,7 +814,7 @@ export default function QuestionsPage() {
         </aside>
 
         {/* Center: question content */}
-        <div className="flex-1 overflow-auto p-6 flex flex-col gap-5">
+        <div className="flex-1 overflow-auto min-w-0 p-6 space-y-5">
 
           {/* Question header */}
           <div>

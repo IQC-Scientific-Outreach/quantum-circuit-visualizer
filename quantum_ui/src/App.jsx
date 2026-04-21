@@ -268,7 +268,7 @@ function App() {
       </aside>
 
       {/* Circuit board */}
-      <div className="flex-1 overflow-auto p-3 bg-slate-950">
+      <div className="flex-1 overflow-auto min-w-0 p-3 bg-slate-950">
         <div className="bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl p-5 inline-block min-w-max">
 
           {/* Time scrubber row */}

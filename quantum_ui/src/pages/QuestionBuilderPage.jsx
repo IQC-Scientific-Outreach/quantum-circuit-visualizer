@@ -624,7 +624,7 @@ function QuestionEditor({ question: q, onChange }) {
   const answerPalette = ALL_PALETTE_GATES.filter(g => q.allowedGates.includes(g));
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-3xl shrink-0">
 
       {/* ── Basic Info ─────────────────────────────────────────────────────── */}
       <section className={sectionCls}>
@@ -998,14 +998,14 @@ export default function QuestionBuilderPage() {
           </div>
         </aside>
 
-        <main className="flex-1 overflow-y-auto p-6 flex flex-col">
+        <main className="flex-1 overflow-y-auto min-w-0 p-6 flex flex-col">
           {selectedQ
             ? <QuestionEditor key={selectedQ.id} question={selectedQ} onChange={updateQuestion} />
-            : <div className="text-slate-500 text-sm mt-8 text-center">Select a question or click "+ New Question".</div>
+            : <div className="text-slate-500 text-sm mt-8 text-center shrink-0">Select a question or click "+ New Question".</div>
           }
 
           {/* Credits section placed at the bottom of the main scrollable area */}
-          <div className="mt-auto pt-10">
+          <div className="mt-auto pt-10 shrink-0">
             <Credits />
           </div>
         </main>
