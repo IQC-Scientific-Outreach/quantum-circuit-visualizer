@@ -1,4 +1,4 @@
-# Quantum Circuit Visualizer
+# IQC Quantum Circuit Visualizer
 
 **Website:** https://iqc-circuit-visualizer.vercel.app 
 
