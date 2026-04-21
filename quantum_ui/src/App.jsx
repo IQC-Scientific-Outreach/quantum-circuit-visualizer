@@ -20,14 +20,15 @@ import './App.css'
 
 function App() {
   const [circuit, setCircuit] = useState([
-    [null, null, null, null],
-    [null, null, null, null]
+    Array(10).fill(null),
+    Array(10).fill(null)
   ]);
 
   const [engine, setEngine] = useState(null);
   const [isReady, setIsReady] = useState(false);
-  const [simResults, setSimResults] = useState(null);
-
+  
+  // Counter used to force a recalculation in useMemo when the user clicks "Resample"
+  const [resampleCount, setResampleCount] = useState(0);
   const [shots, setShots] = useState(100);
   const [measureStep, setMeasureStep] = useState(null);
   const [selectedQubit, setSelectedQubit] = useState(null);
@@ -60,37 +61,35 @@ function App() {
     loadEngine();
   }, []);
 
-  const runCircuit = useCallback((targetStep = null) => {
-    setSimResults(simulateCircuit(engine, circuit, targetStep, shots, selectedQubit));
-  }, [circuit, engine, shots, selectedQubit]);
+  // ✅ Good: Calculate derived data during rendering and cache expensive WASM calls
+  const simResults = useMemo(() => {
+    if (!isReady || !engine) return null;
+    return simulateCircuit(engine, circuit, measureStep, shots, selectedQubit);
+  }, [isReady, engine, circuit, measureStep, shots, selectedQubit, resampleCount]);
 
-  useEffect(() => {
-    if (isReady && engine) {
-      runCircuit(measureStep);
-    }
-  }, [measureStep, circuit, shots, isReady, engine, runCircuit]);
+  // ---------------------------------------------------------------------------
+  // Adjusting state during render (replaces multiple Effects)
+  // ---------------------------------------------------------------------------
+  const [prevCircuit, setPrevCircuit] = useState(circuit);
+  
+  if (circuit !== prevCircuit) {
+    setPrevCircuit(circuit);
 
-  // Sync code input when circuit changes externally (drag-drop, etc.)
-  useEffect(() => {
+    // 1. Sync code input when circuit changes externally
     if (!codeInputFocused.current) {
       setCodeInput(circuitToCode(circuit));
     }
-  }, [circuit]);
 
-  // ---------------------------------------------------------------------------
-  // Auto-resize
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
+    // 2. Auto-resize the circuit grid
     let highestOccupiedIndex = -1;
-    circuit.forEach(wire => {
+    for (const wire of circuit) {
       for (let i = wire.length - 1; i >= 0; i--) {
         if (wire[i] !== null) {
           if (i > highestOccupiedIndex) highestOccupiedIndex = i;
           break;
         }
       }
-    });
-
+    }
     const desiredLength = Math.max(10, highestOccupiedIndex + 6);
     const currentLength = circuit[0].length;
 
@@ -105,7 +104,7 @@ function App() {
         })
       );
     }
-  }, [circuit]);
+  }
 
   // ---------------------------------------------------------------------------
   // Drag-and-drop monitor
@@ -385,7 +384,7 @@ function App() {
         simResults={simResults}
         shots={shots}
         setShots={setShots}
-        onResample={() => runCircuit(measureStep)}
+        onResample={() => setResampleCount(c => c + 1)}
       >
               {/* Circuit code */}
               <div className="px-4 py-3">

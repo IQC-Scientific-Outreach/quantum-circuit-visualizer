@@ -314,8 +314,8 @@ export default function QuestionsPage() {
 
   const [engine,   setEngine]   = useState(null);
   const [isReady,  setIsReady]  = useState(false);
-  const [simResults, setSimResults] = useState(null);
   const [shots, setShots] = useState(100);
+  const [resampleCount, setResampleCount] = useState(0);
   const [selectedQubit, setSelectedQubit] = useState(null);
   const [hoveredBarrier, setHoveredBarrier] = useState(null);
 
@@ -360,42 +360,49 @@ export default function QuestionsPage() {
     loadEngine();
   }, []);
 
-  // ── Simulate circuit whenever circuitState changes ──────────────────────────
-  useEffect(() => {
-    if (isReady && engine) {
-      const normalizedCircuit = circuitState.map(wire => wire.map(cell => {
-        if (!cell) return null;
-        if (cell.blank) return cell.filled ? { ...cell, name: cell.filled } : null;
-        return { ...cell };
-      }));
-      setSimResults(simulateCircuit(engine, normalizedCircuit, null, shots, selectedQubit));
-    }
-  }, [circuitState, isReady, engine, shots, selectedQubit]);
+  // ── ✅ Good: Calculate derived data during rendering and cache expensive WASM calls
+  const simResults = useMemo(() => {
+    if (!isReady || !engine) return null;
+    const normalizedCircuit = circuitState.map(wire => wire.map(cell => {
+      if (!cell) return null;
+      if (cell.blank) return cell.filled ? { ...cell, name: cell.filled } : null;
+      return { ...cell };
+    }));
+    return simulateCircuit(engine, normalizedCircuit, null, shots, selectedQubit);
+  }, [isReady, engine, circuitState, shots, selectedQubit, resampleCount]);
 
-  // ── Auto-expand circuit state to always have empty buffer slots at the end ──
-  useEffect(() => {
-    if (questionIndex < scores.length) return; // Skip auto-expanding on past questions
-    let highestOccupiedIndex = -1;
-    circuitState.forEach(wire => {
-      for (let i = wire.length - 1; i >= 0; i--) {
-        if (wire[i] !== null) {
-          if (i > highestOccupiedIndex) highestOccupiedIndex = i;
-          break;
+  // ── Adjust state during render: Auto-expand circuit empty buffer slots ──────
+  const [prevCircuitForResize, setPrevCircuitForResize] = useState(circuitState);
+  const [prevQuestionIndex, setPrevQuestionIndex] = useState(questionIndex);
+
+  if (circuitState !== prevCircuitForResize || questionIndex !== prevQuestionIndex) {
+    setPrevCircuitForResize(circuitState);
+    setPrevQuestionIndex(questionIndex);
+
+    if (questionIndex >= scores.length) { // equivalent to skipping auto-expanding on past questions
+      let highestOccupiedIndex = -1;
+      for (const wire of circuitState) {
+        for (let i = wire.length - 1; i >= 0; i--) {
+          if (wire[i] !== null) {
+            if (i > highestOccupiedIndex) highestOccupiedIndex = i;
+            break;
+          }
         }
       }
-    });
-    const minLength = Math.max(...question.circuit.map(w => w.length));
-    const desiredLength = question.restrictToBlanks
-      ? minLength
-      : Math.max(minLength + 3, highestOccupiedIndex + 4);
-    const currentLength = circuitState[0].length;
-
-    if (currentLength < desiredLength) {
-      setCircuitState(prev => prev.map(wire => [...wire, ...Array(desiredLength - currentLength).fill(null)]));
-    } else if (currentLength > desiredLength) {
-      setCircuitState(prev => prev.map(wire => wire.slice(0, desiredLength)));
+      
+      const minLength = Math.max(...question.circuit.map(w => w.length));
+      const desiredLength = question.restrictToBlanks
+        ? minLength
+        : Math.max(minLength + 3, highestOccupiedIndex + 4);
+      const currentLength = circuitState[0].length;
+  
+      if (currentLength < desiredLength) {
+        setCircuitState(prev => prev.map(wire => [...wire, ...Array(desiredLength - currentLength).fill(null)]));
+      } else if (currentLength > desiredLength) {
+        setCircuitState(prev => prev.map(wire => wire.slice(0, desiredLength)));
+      }
     }
-  }, [circuitState, question, questionIndex, scores.length]);
+  }
 
   // ── DnD monitor ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1006,14 +1013,7 @@ export default function QuestionsPage() {
           simResults={simResults}
           shots={shots}
           setShots={setShots}
-          onResample={() => {
-            const normalizedCircuit = circuitState.map(w => w.map(c => {
-              if (!c) return null;
-              if (c.blank) return c.filled ? { ...c, name: c.filled } : null;
-              return { ...c };
-            }));
-            setSimResults(simulateCircuit(engine, normalizedCircuit, null, shots, selectedQubit));
-          }}
+          onResample={() => setResampleCount(c => c + 1)}
           scrollableCredits={true}
         />
       </div>
