@@ -1,18 +1,53 @@
 # Quantum Circuit Visualizer
 
-**Live app:** https://quantum-circuit-visualizer-steel.vercel.app/
+**Website:** https://quantum-circuit-visualizer-steel.vercel.app/
 
-An interactive quantum circuit tool built for teaching. Students drag and drop quantum gates onto a circuit, see the results update in real time, and answer quiz questions set by their teacher. No installation needed on the student side — just a browser.
+A browser-based quantum circuit visualizer and simulator! 
+
+No installation required! The visualizer supports drag-and-drop circuit building with timesteps, full statevector inspection, shot-based measurement histograms, single-qubit state tomography via Pauli expectation values, and complex circuit features including multi-qubit gates, barriers, and classical feed-forward. 
+
+It also doubles as an educational tool. A built-in set of guided questions covers gates, superposition, entanglement, measurement, and feed-forward, and serves as an interactive walkthrough for learning quantum computing from the ground up. For teachers, a full question builder allows creating custom circuit questions with blanks, hidden blocks, and auto-grading, which can be exported and sent to students as a single file.
 
 ---
 
-## User Guide (for Teachers & Students)
+## Features
 
-### What It Is
+- **Drag-and-drop circuit builder** with support for single-qubit gates (H, X, Y, Z, S, T), two-qubit gates (CNOT, CZ), three-qubit gates (Toffoli), measurement, and classical feed-forward (FF_X, FF_Z)
+- **Timestep visualization** with barriers to structure circuit stages
+- **Statevector panel** showing complex amplitudes for all basis states
+- **Measurement histogram** with configurable shot count to observe sampling statistics
+- **Single-qubit state tomography** by clicking any qubit label (e.g. `q[0]`) to display ⟨X⟩, ⟨Y⟩, ⟨Z⟩ Pauli expectation values in the results panel
+- **Built-in guided questions** that double as a step-by-step learning guide, no file needed
+- **Quiz mode** for loading teacher-created `.qpkg` question sets with blanks, hidden circuit regions, and per-question explanations
+- **Question Builder** for teachers to create, export, and share custom quizzes
 
-This is a web-based quantum circuit sandbox with a built-in quiz system. Teachers build quiz questions using a visual editor, export them as a `.qpkg` file, and send that file to students. Students load the file in their browser and work through the questions — dragging gates into blank slots, running simulations, and submitting answers for automatic grading.
+---
 
-There is also a **Practice Mode** available at all times (no file needed), which loads a set of 23 built-in questions covering gates, superposition, entanglement, measurement, and more. Students can use this to explore quantum circuits freely before attempting a teacher-created quiz.
+## User Guide
+
+### Getting Started
+
+Open the app in a browser. The free-form **Circuit Builder** is on the home page: drag gates from the left palette onto the grid, hit **Run**, and inspect the results. No account or setup needed.
+
+The **Questions** tab loads a set of 23 built-in questions that progressively introduce quantum concepts. These work as both a tutorial and a practice set.
+
+---
+
+### Reading the Results
+
+After running a circuit, the results panel on the left shows:
+
+| Panel | What it shows |
+|---|---|
+| **Amplitudes** | The complex amplitudes of each basis state in the statevector |
+| **Counts** | A histogram of measurement outcomes sampled over multiple shots |
+| **Expectation Values** | Click any qubit label (e.g. `q[0]`) to see ⟨X⟩, ⟨Y⟩, ⟨Z⟩ for that qubit |
+
+**Expectation values per qubit:** Click a qubit label on the left side of the circuit (e.g. `q[0]`, `q[1]`) to show the Pauli expectation values ⟨X⟩, ⟨Y⟩, ⟨Z⟩ for that qubit in the results panel. This is useful for reading out the qubit state in different measurement bases, and effectively gives a single-qubit state tomography readout.
+
+**Amplitudes and counts** always appear together: amplitudes show the exact statevector entries, and counts show a sampled histogram (default 100 shots) to illustrate measurement statistics.
+
+**Timestep-by-timestep state:** Use barriers to visually separate circuit stages. The simulation runs the full circuit as built; to inspect the intermediate state at a given point, place a measurement gate at that timestep. The statevector and probabilities always reflect the full circuit as built.
 
 ---
 
@@ -22,7 +57,7 @@ There is also a **Practice Mode** available at all times (no file needed), which
 2. Build each question:
    - Set the number of qubits and timesteps.
    - Drag gates onto the circuit to define the starting circuit (what students see).
-   - Mark certain cells as **blanks** — students will need to fill these in.
+   - Mark certain cells as **blanks** for students to fill in.
    - Optionally add **hidden blocks** to obscure part of the circuit.
    - Set the allowed gate palette (restrict which gates students can use).
    - Add a title, description (supports LaTeX math), and an explanation shown after submission.
@@ -45,7 +80,7 @@ You can also click **Save JSON Backup** at any time to save your work-in-progres
 7. When satisfied, click **Submit** to check your answer and see your score.
 8. After submitting, the explanation for that question is revealed.
 
-If you don't have a `.qpkg` file, **Practice Mode** loads automatically with 23 built-in questions — no file needed.
+If you do not have a `.qpkg` file, the built-in practice questions load automatically with no file needed.
 
 ---
 
@@ -63,7 +98,7 @@ After running a circuit, the results panel on the left shows:
 
 **Amplitudes and counts** always appear together: amplitudes show the exact statevector entries, and counts show a sampled histogram (default 100 shots) to illustrate measurement statistics.
 
-**Timestep-by-timestep state:** The simulation runs the full circuit. To inspect the state partway through, place a measurement gate at the desired timestep — the statevector and probabilities shown always reflect the full circuit as built.
+**Timestep-by-timestep state:** The simulation runs the full circuit. To inspect the state partway through, place a measurement gate at the desired timestep. The statevector and probabilities shown always reflect the full circuit as built.
 
 ---
 
@@ -77,7 +112,7 @@ You can deploy your own instance in a few minutes.
 2. **Import the project into Vercel:**
    - Go to [vercel.com](https://vercel.com) and create a new project from your fork.
    - Set the **Root Directory** to `quantum_ui`.
-   - Vercel will auto-detect Vite — the default build settings work without changes.
+   - Vercel will auto-detect Vite. The default build settings work without changes.
    - The `vercel.json` file inside `quantum_ui/` handles SPA routing automatically.
 3. **Deploy.** Vercel builds and publishes the app. Any subsequent `git push` to `main` triggers a new deployment.
 
@@ -94,7 +129,7 @@ To replace the built-in questions with your own:
 1. In the Question Builder, build your questions and click **Save JSON Backup**. This downloads a `questions_backup.json` file.
 2. Open `quantum_ui/src/questions/questions.json` in a text editor.
 3. Replace the entire file contents with the contents of your `questions_backup.json`.
-4. Commit and push — Vercel will redeploy with your questions as the new default.
+4. Commit and push. Vercel will redeploy with your questions as the new default.
 
 Students who visit the app will now see your questions in Practice Mode without needing to load any file.
 
@@ -142,7 +177,7 @@ flowchart TD
 
 ### Quantum Engine
 
-The backend is a statevector simulator written in C++ (`quantum_engine/src/`) and compiled to a ~40 KB WASM module via Emscripten. The compiled output is committed to `quantum_ui/src/wasm/` and loaded in the browser at runtime — no server-side compute required.
+The backend is a statevector simulator written in C++ (`quantum_engine/src/`) and compiled to a ~40 KB WASM module via Emscripten. The compiled output is committed to `quantum_ui/src/wasm/` and loaded in the browser at runtime. No server-side compute required.
 
 Supported gates: `H`, `X`, `Y`, `Z`, `S`, `T`, `CNOT`, `CZ`, `Toffoli (CCX)`, `MEASURE`, `FF_X` (feed-forward X), `FF_Z` (feed-forward Z).
 

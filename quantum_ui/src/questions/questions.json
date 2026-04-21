@@ -29,7 +29,7 @@
   {
     "id": 5,
     "title": "X gate",
-    "description": "The $X$ gate you just saw transforms $$\\ket 0$$ into $$\\ket 1$$, and $$\\ket 1$$ into $$\\ket 0$$. It is thus the quantum equivalent of the NOT gate for classical computers.\n \nIt is represented as $$X = \\begin{bmatrix} 0 & 1 \\\\ 1 & 0 \\end{bmatrix} = \\ket0\\bra1 + \\ket1\\bra0$$\n\n\nDrag and drop the correct gates to transform the circuit to $\\ket{10}$",
+    "description": "The $X$ gate you just saw transforms $$\\ket 0$$ into $$\\ket 1$$, and $$\\ket 1$$ into $$\\ket 0$$. It is thus the quantum equivalent of the NOT gate for classical computers.\n \nIt is represented as $$X = \\begin{bmatrix} 0 & 1 \\\\ 1 & 0 \\end{bmatrix} = \\ket0\\bra1 + \\ket1\\bra0$$\n\n\nIn this circuit, the state after the hidden elements is $\\ket{01}$ as seen in the results panel. Drag and drop the correct gates to transform the circuit to $\\ket{10}$",
     "points": 10,
     "restrictToBlanks": false,
     "allowedGates": [
@@ -107,7 +107,7 @@
       ]
     ],
     "hiddenBlocks": [],
-    "explanation": "We can see how this works using both the bra-ket notation and the matrix form!\n$H = \\ket+\\bra0 + \\ket-\\bra1$, which means it maps $\\ket0$ to $\\ket+$ and $\\ket1$ to $\\ket-$. \nAlso, $H\\ket0 =  \n\\begin{bmatrix} \\frac{1}{\\sqrt{2}} & \\frac{1}{\\sqrt{2}} \n\\\\ \\frac{1}{\\sqrt{2}} & \\frac{-1}{\\sqrt{2}} \\end{bmatrix}\n\\begin{bmatrix}1 \\\\ 0\\end{bmatrix}\n= \\begin{bmatrix}\\frac{1}{\\sqrt{2}} \\\\ \\frac{1}{\\sqrt{2}} \\end{bmatrix}$\n"
+    "explanation": "What is the $\\ket+$ state? \nLooking at the probabilities on the right, we see that there's now a 50% chance of the qubit being measured as zero or one. This is our first example of a quantum superposition!\n\n\nWe can see how this works using both the bra-ket notation and the matrix form!\n$H = \\ket+\\bra0 + \\ket-\\bra1$, which means it maps $\\ket0$ to $\\ket+$ and $\\ket1$ to $\\ket-$. \nAlso, $H\\ket0 =  \n\\begin{bmatrix} \\frac{1}{\\sqrt{2}} & \\frac{1}{\\sqrt{2}} \n\\\\ \\frac{1}{\\sqrt{2}} & \\frac{-1}{\\sqrt{2}} \\end{bmatrix}\n\\begin{bmatrix}1 \\\\ 0\\end{bmatrix}\n= \\begin{bmatrix}\\frac{1}{\\sqrt{2}} \\\\ \\frac{1}{\\sqrt{2}} \\end{bmatrix}$\n"
   },
   {
     "id": 6,
@@ -147,7 +147,7 @@
       ]
     ],
     "hiddenBlocks": [],
-    "explanation": "We saw $H = \\ket+\\bra0 + \\ket-\\bra1$, which means it maps $\\ket0$ to $\\ket+$ and $\\ket1$ to $\\ket-$. \nTo get $\\ket-$, we can map $\\ket0$ to $\\ket1$ using the $X$ gate, and map $\\ket1$ to $\\ket-$ using the $H$ gate.\n\n\nAlso, $HX\\ket0 =  \n \\frac{1}{\\sqrt{2}} \\begin{bmatrix} 1 & 1\n\\\\1 & -1 \\end{bmatrix}\n\\begin{bmatrix} 0 & 1\n\\\\1 & 0 \\end{bmatrix}\n\\begin{bmatrix}1 \\\\ 0\\end{bmatrix}\n=  \\frac{1}{\\sqrt{2}} \\begin{bmatrix} 1 & 1\n\\\\1 & -1 \\end{bmatrix}\\begin{bmatrix}0 \\\\ 1\\end{bmatrix}\n= \\begin{bmatrix}\\frac{1}{\\sqrt{2}} \\\\ \\frac{-1}{\\sqrt{2}} \\end{bmatrix}\n= \\ket-$"
+    "explanation": "What is the $\\ket-$ state? \nIt has the same probabilities as the $\\ket+$ state, but there's a negative amplitude on the $\\ket1$ component. The $\\ket+$ and $\\ket-$ states are orthogonal, meaning they can be distinguished and form a basis.\n\n\nWe saw $H = \\ket+\\bra0 + \\ket-\\bra1$, which means it maps $\\ket0$ to $\\ket+$ and $\\ket1$ to $\\ket-$. \nTo get $\\ket-$, we can map $\\ket0$ to $\\ket1$ using the $X$ gate, and map $\\ket1$ to $\\ket-$ using the $H$ gate.\n\n\nAlso, $HX\\ket0 =  \n \\frac{1}{\\sqrt{2}} \\begin{bmatrix} 1 & 1\n\\\\1 & -1 \\end{bmatrix}\n\\begin{bmatrix} 0 & 1\n\\\\1 & 0 \\end{bmatrix}\n\\begin{bmatrix}1 \\\\ 0\\end{bmatrix}\n=  \\frac{1}{\\sqrt{2}} \\begin{bmatrix} 1 & 1\n\\\\1 & -1 \\end{bmatrix}\\begin{bmatrix}0 \\\\ 1\\end{bmatrix}\n= \\begin{bmatrix}\\frac{1}{\\sqrt{2}} \\\\ \\frac{-1}{\\sqrt{2}} \\end{bmatrix}\n= \\ket-$"
   },
   {
     "id": 21,
@@ -318,7 +318,7 @@
         "endStep": 0
       }
     ],
-    "explanation": "$T = \\sqrt[4]{Z}$\n$TT = \\sqrt[4]{Z}\\sqrt[4]{Z} = \\sqrt{Z} = S$"
+    "explanation": "$T = \\sqrt[4]{Z}$\n$TT = \\sqrt[4]{Z}\\sqrt[4]{Z} = \\sqrt{Z} = S$\n\nThe $S$ gate shifts the phase by $\\pi/2$. \nLook at the output state: it's still a superposition, but now has a complex amplitude for the $\\ket1$ component."
   },
   {
     "id": 8,
@@ -413,7 +413,7 @@
   {
     "id": 10,
     "title": "2 qubit gates",
-    "description": "We need qubits to interact to do meaningful computation. We use 2 qubit gates for such scenarios. The most commonly noted one is the $CX$ (also known as $CNOT$) gate.\n\nCX applies the X gate on\u000bthe target qubit\u000bdepending on the\u000bstate of the control qubit. \nIt's given by $$CX_{c=0,t=1} = \\begin{bmatrix} \n1 & 0 & 0 & 0 \\\\\n0 & 1 & 0 & 0 \\\\\n0 & 0 & 0 & 1 \\\\\n0 & 0 & 1 & 0 \n\\end{bmatrix} = \n\\ket{00}\\bra{00} + \\ket{01}\\bra{01} + \\ket{\\textbf{10}}\\bra{\\textbf{11}} + \\ket{\\textbf{11}}\\bra{\\textbf{10}}$$\n\n\nMake the resulting circuit $$\\ket{11}$$",
+    "description": "We need qubits to interact to do meaningful computation. We use 2 qubit gates for such scenarios. The most commonly noted one is the $CX$ (also known as $CNOT$) gate.\n\n$CX$ applies the $X$ gate on the target qubit depending on the state of the control qubit. \nIt's given by $$CX_{c=0,t=1} = \\begin{bmatrix} \n1 & 0 & 0 & 0 \\\\\n0 & 1 & 0 & 0 \\\\\n0 & 0 & 0 & 1 \\\\\n0 & 0 & 1 & 0 \n\\end{bmatrix} = \n\\ket{00}\\bra{00} + \\ket{01}\\bra{01} + \\ket{10}\\bra{11} + \\ket{11}\\bra{10}$$\n\n\nMake the resulting circuit $$\\ket{11}$$",
     "points": 10,
     "restrictToBlanks": true,
     "allowedGates": [
@@ -557,12 +557,12 @@
       ]
     ],
     "hiddenBlocks": [],
-    "explanation": "We've seen that $HZH = X$ and $HH = I$ (identity matrix i.e, does nothing).\nThus, we can use our $CZ$ and $H$s to make a $CX$ gate (and thus, the entangled $\\frac{\\ket{00} + \\ket{11}}{\\sqrt{2}}$ state)!"
+    "explanation": "We've seen that $HZH = X$ and $HH = I$ (identity matrix i.e, does nothing).\nThus, we can use our $CZ$ and $H$s to make a $CX$ gate (and thus, the entangled $\\frac{\\ket{00} + \\ket{11}}{\\sqrt{2}}$ state)!\n\n\nNote that, unlike $CX$, the $CZ$ operation looks the same regardless of what qubit is considered the \"control\" and which one is the \"target\". You will get the same entangled state if you put the final Hadamard on Qubit 0 or Qubit 1."
   },
   {
     "id": 17,
     "title": "Measuring entanglement in the X basis",
-    "description": "Consider $$\\ket{\\Psi^-} = \\frac{\\ket{01} -\\ket{10}}{\\sqrt{2}}$$ constructed below.\nMeasure this circuit in the $X$ ($+/-$) basis. \n\n\nDo you see entanglement even when it's measured in a different basis? Can you think of how you can re-write $\\ket{\\Psi^-}$ using $\\ket+$ and $\\ket-$?",
+    "description": "Consider $$\\ket{\\Psi^-} = \\frac{\\ket{01} -\\ket{10}}{\\sqrt{2}}$$ constructed below, **where the measurements are always opposite in the $Z$ basis**.\nMeasure this circuit in the $X$ ($+/-$) basis. \n\n\nDo you see entanglement even when it's measured in a different basis? Can you think of how you can re-write $\\ket{\\Psi^-}$ using $\\ket+$ and $\\ket-$?",
     "points": 10,
     "restrictToBlanks": true,
     "allowedGates": [
@@ -628,7 +628,7 @@
       ]
     ],
     "hiddenBlocks": [],
-    "explanation": "We know that we can add a $H$ gate before measurement to measure in the $+/-$ basis. Despite changing the basis of measurement, did you notice that our qubits are still entangled?"
+    "explanation": "We know that we can add a $H$ gate before measurement to measure in the $+/-$ basis. Despite changing the basis of measurement, our qubits are still entangled.\n\n\nDespite changing the basis of measurement, did you notice that the qubits still always give opposite results?"
   },
   {
     "id": 23,
@@ -827,7 +827,7 @@
   {
     "id": 16,
     "title": "Toffoli gate",
-    "description": "We can have multi-qubit gates beyond 2-qubit gates. One example is the Toffoli gate, or the controlled-controlled-X (CCX) gate. It has 2 control qubits and 1 target qubit, which is flipped if **both** control qubits are 1. \nGiven the circuit below, construct $\\ket{GHZ} = \\dfrac{\\ket{000} + \\ket{111}}{\\sqrt{2}}$ using the Toffoli gate.",
+    "description": "We can have multi-qubit gates beyond 2-qubit gates. One example is the Toffoli gate, or the controlled-controlled-X (CCX) gate. It has 2 control qubits and 1 target qubit, which is flipped if **both** control qubits are 1. \nGiven the circuit below, construct $\\ket{GHZ} = \\dfrac{\\ket{000} + \\ket{111}}{\\sqrt{2}}$ using the Toffoli gate.\n\n\nHint: You can drag the elements of controlled gates **to switch** which qubits are the controls and which are the targets.",
     "points": 10,
     "restrictToBlanks": false,
     "allowedGates": [
