@@ -2,7 +2,7 @@
 
 **Website:** https://iqc-circuit-visualizer.vercel.app 
 
-A browser-based drag-and-drop quantum circuit visualizer & simulator! 
+A browser-based drag-and-drop quantum circuit visualizer & simulator!
 
 No installation required! The visualizer supports **drag-and-drop circuit building** with timesteps, full statevector inspection, shot-based measurement histograms, single-qubit state tomography, and complex circuit features including multi-qubit gates, barriers, and classical feed-forward. 
 
