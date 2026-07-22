@@ -29,7 +29,29 @@ function parseBuilderBackup(questions) {
   
   return questions.map((q, i) => {
     const id = q.id || i + 1;
-    
+
+    // ── Multiple-choice questions ──
+    if (q.questionType === 'mcq') {
+      const out = {
+        id,
+        title: q.title || `Question ${id}`,
+        description: q.description,
+        points: q.points,
+        questionType: 'mcq',
+        choices: q.choices || [],
+        correctChoice: q.correctChoice ?? 0,
+      };
+      if (q.hideCircuit) {
+        out.hideCircuit = true;
+      } else if (q.circuit) {
+        out.circuit = q.circuit.map(wire =>
+          wire.map(cell => (cell ? { ...cell, locked: true } : null))
+        );
+      }
+      if (q.explanation) out.explanation = q.explanation;
+      return out;
+    }
+
     // 1. Trim trailing empty steps
     let lastOcc = -1;
     q.circuit.forEach(wire => {

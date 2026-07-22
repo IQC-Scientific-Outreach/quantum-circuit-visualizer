@@ -239,14 +239,17 @@ function FinalScreen({ scores, questions, onRetry }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function initCircuit(question) {
-  const minLength     = Math.max(...question.circuit.map(w => w.length));
-  const desiredLength = question.restrictToBlanks ? minLength : Math.max(8, minLength + 3);
-  return question.circuit.map(wire =>
+  const src = (question.circuit && question.circuit.length > 0) ? question.circuit : [[null]];
+  const minLength     = Math.max(1, ...src.map(w => w.length));
+  // MCQ (and restrict-to-blanks) questions show the given circuit as-is — no editable buffer.
+  const desiredLength = (question.restrictToBlanks || question.questionType === 'mcq') ? minLength : Math.max(8, minLength + 3);
+  return src.map(wire =>
     [...wire.map(cell => (cell ? { ...cell } : null)), ...Array(Math.max(0, desiredLength - minLength)).fill(null)]
   );
 }
 
 function getAnswerCircuit(question) {
+  if (question.questionType === 'mcq') return initCircuit(question);
   const base = initCircuit(question);
   if (!question.restrictToBlanks) {
     let next = base.map(w => w.map(c => (c && !c.locked) ? null : c));
@@ -295,6 +298,53 @@ function getAnswerCircuit(question) {
   return next;
 }
 
+// ─── Multiple-choice answers ────────────────────────────────────────────────
+// `revealed` colours the correct/incorrect options; `locked` disables selection.
+function MCQChoices({ choices, selectedChoice, correctChoice, onSelect, revealed, locked }) {
+  return (
+    <div className="flex flex-col gap-2.5 max-w-2xl">
+      {choices.map((choice, i) => {
+        const isSelected = selectedChoice === i;
+        const isCorrect  = i === correctChoice;
+
+        let boxCls = 'border-slate-700 bg-slate-900 hover:border-slate-500';
+        let badgeCls = 'border-slate-600 text-slate-400';
+        if (revealed) {
+          if (isCorrect)       { boxCls = 'border-emerald-500/70 bg-emerald-500/10'; badgeCls = 'border-emerald-400 text-emerald-300'; }
+          else if (isSelected) { boxCls = 'border-red-500/70 bg-red-500/10';         badgeCls = 'border-red-400 text-red-300'; }
+          else                 { boxCls = 'border-slate-700 bg-slate-900 opacity-60'; }
+        } else if (isSelected) {
+          boxCls = 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/40';
+          badgeCls = 'border-blue-400 text-blue-300';
+        }
+
+        return (
+          <button
+            key={i}
+            disabled={locked}
+            onClick={() => onSelect(i)}
+            className={`flex items-start gap-3 text-left px-4 py-3 rounded-xl border transition-colors ${boxCls} ${locked ? 'cursor-default' : 'cursor-pointer'}`}
+          >
+            <span className={`shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-xs font-semibold ${badgeCls}`}>
+              {String.fromCharCode(65 + i)}
+            </span>
+            <div className="text-sm text-slate-200 leading-relaxed pt-0.5 min-w-0 flex-1">
+              <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={{ p: ({node, ...props}) => <p className="mb-0 whitespace-pre-wrap" {...props} /> }}
+              >
+                {choice || `Choice ${String.fromCharCode(65 + i)}`}
+              </ReactMarkdown>
+            </div>
+            {revealed && isCorrect && <span className="ml-2 text-emerald-400 text-xs shrink-0 pt-1">✓ correct</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function QuestionsPage() {
   // ── Active question set (default = built-in, replaced when a .qpkg is loaded) ──
   const [activeQuestions, setActiveQuestions] = useState(QUESTIONS);
@@ -311,6 +361,9 @@ export default function QuestionsPage() {
   const [feedback,        setFeedback]        = useState(null);
   const [answerRevealed,  setAnswerRevealed]  = useState(false);
   const [hiddenCircuitRevealed, setHiddenCircuitRevealed] = useState(false);
+  const [selectedChoice,  setSelectedChoice]  = useState(null);
+
+  const isMCQ = question.questionType === 'mcq';
 
   const [engine,   setEngine]   = useState(null);
   const [isReady,  setIsReady]  = useState(false);
@@ -329,6 +382,7 @@ export default function QuestionsPage() {
     setFeedback(null);
     setAnswerRevealed(false);
     setHiddenCircuitRevealed(false);
+    setSelectedChoice(null);
   }
 
   // ── Load .qpkg file ─────────────────────────────────────────────────────────
@@ -362,14 +416,14 @@ export default function QuestionsPage() {
 
   // ── ✅ Good: Calculate derived data during rendering and cache expensive WASM calls
   const simResults = useMemo(() => {
-    if (!isReady || !engine) return null;
+    if (!isReady || !engine || isMCQ) return null;
     const normalizedCircuit = circuitState.map(wire => wire.map(cell => {
       if (!cell) return null;
       if (cell.blank) return cell.filled ? { ...cell, name: cell.filled } : null;
       return { ...cell };
     }));
     return simulateCircuit(engine, normalizedCircuit, null, shots, selectedQubit);
-  }, [isReady, engine, circuitState, shots, selectedQubit, resampleCount]);
+  }, [isReady, engine, isMCQ, circuitState, shots, selectedQubit, resampleCount]);
 
   // ── Adjust state during render: Auto-expand circuit empty buffer slots ──────
   const [prevCircuitForResize, setPrevCircuitForResize] = useState(circuitState);
@@ -379,7 +433,7 @@ export default function QuestionsPage() {
     setPrevCircuitForResize(circuitState);
     setPrevQuestionIndex(questionIndex);
 
-    if (questionIndex >= scores.length) { // equivalent to skipping auto-expanding on past questions
+    if (!isMCQ && questionIndex >= scores.length) { // equivalent to skipping auto-expanding on past questions
       let highestOccupiedIndex = -1;
       for (const wire of circuitState) {
         for (let i = wire.length - 1; i >= 0; i--) {
@@ -699,22 +753,34 @@ export default function QuestionsPage() {
       setHiddenCircuitRevealed(false);
       setSelectedQubit(null);
       setHoveredBarrier(null);
+      setSelectedChoice(null);
       setQuestionIndex(nextIdx);
     } else {
       setPhase('done');
     }
   }, [scores, question, questionIndex, answerRevealed, activeQuestions]);
 
+  // ── MCQ selection ─────────────────────────────────────────────────────────
+  const mcqLocked = isMCQ && (questionIndex < scores.length || answerRevealed || feedback === 'correct');
+  const selectChoice = (i) => {
+    if (mcqLocked) return;
+    setSelectedChoice(i);
+    setFeedback(null);
+  };
+
   const handleSubmit = () => {
     if (answerRevealed) { advanceQuestion(0); return; }
-    if (checkCorrect()) {
-      setFeedback('correct');
-    } else {
-      setFeedback('incorrect');
-    }
+    const correct = isMCQ ? (selectedChoice === question.correctChoice) : checkCorrect();
+    setFeedback(correct ? 'correct' : 'incorrect');
   };
 
   const handleGetAnswer = () => {
+    if (isMCQ) {
+      setSelectedChoice(question.correctChoice);
+      setAnswerRevealed(true);
+      setFeedback(null);
+      return;
+    }
     setCircuitState(getAnswerCircuit(question));
     setAnswerRevealed(true);
     setFeedback(null);
@@ -731,7 +797,9 @@ export default function QuestionsPage() {
   const currentScore = scores.reduce((s, r) => s + r.points, 0);
 
   // For equivalent-circuit questions: show a separator after the given circuit
-  const separatorStep = !question.restrictToBlanks ? question.circuit[0].length : undefined;
+  const separatorStep = (!isMCQ && !question.restrictToBlanks) ? question.circuit[0].length : undefined;
+  // MCQ questions that opted to keep a circuit render it read-only above the choices
+  const showMcqCircuit = isMCQ && !question.hideCircuit && question.circuit && question.circuit.some(w => w.length > 0);
 
   return (
     <div className="fixed inset-0 w-full flex flex-col font-sans text-slate-300 bg-slate-950">
@@ -803,7 +871,8 @@ export default function QuestionsPage() {
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Left: gate palette */}
+        {/* Left: gate palette (circuit questions only) */}
+        {!isMCQ && (
         <aside className="w-44 bg-slate-900 border-r border-slate-700/50 flex flex-col shrink-0">
           <div className="px-4 py-3 border-b border-slate-700/50">
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Gate Palette</p>
@@ -813,12 +882,13 @@ export default function QuestionsPage() {
           </div>
           <div className="p-4 overflow-y-auto flex-1">
             <div className="grid grid-cols-2 gap-3 items-center justify-items-center">
-              {question.allowedGates.map(gate => (
+              {(question.allowedGates || []).map(gate => (
                 <DraggableGate key={gate} gate={gate} />
               ))}
             </div>
           </div>
         </aside>
+        )}
 
         {/* Center: question content */}
         <div className="flex-1 overflow-auto min-w-0 p-6 space-y-5">
@@ -847,21 +917,45 @@ export default function QuestionsPage() {
             )}
           </div>
 
-          {/* Circuit board */}
-          <div className="overflow-auto">
-            <QuestionCircuit
-              circuitState={circuitState}
-              hiddenBlocks={hiddenCircuitRevealed ? [] : question.hiddenBlocks}
-              restrictToBlanks={question.restrictToBlanks}
-              onDelete={deleteGate}
-              separatorStep={separatorStep}
-              selectedQubit={selectedQubit}
-              onWireClick={wi => setSelectedQubit(prev => prev === wi ? null : wi)}
-              hoveredBarrier={hoveredBarrier}
-              onHoverBarrier={setHoveredBarrier}
-              onResizeBarrier={resizeBarrier}
-            />
-          </div>
+          {/* Circuit board / MCQ choices */}
+          {isMCQ ? (
+            <div className="space-y-5">
+              {showMcqCircuit && (
+                <div className="overflow-auto">
+                  <QuestionCircuit
+                    circuitState={circuitState}
+                    hiddenBlocks={null}
+                    restrictToBlanks={true}
+                    onDelete={() => {}}
+                    selectedQubit={null}
+                  />
+                </div>
+              )}
+              <MCQChoices
+                choices={question.choices || []}
+                selectedChoice={selectedChoice}
+                correctChoice={question.correctChoice}
+                onSelect={selectChoice}
+                revealed={mcqLocked}
+                locked={mcqLocked}
+              />
+            </div>
+          ) : (
+            <div className="overflow-auto">
+              <QuestionCircuit
+                circuitState={circuitState}
+                hiddenBlocks={hiddenCircuitRevealed ? [] : question.hiddenBlocks}
+                restrictToBlanks={question.restrictToBlanks}
+                onDelete={deleteGate}
+                separatorStep={separatorStep}
+                selectedQubit={selectedQubit}
+                onWireClick={wi => setSelectedQubit(prev => prev === wi ? null : wi)}
+                hoveredBarrier={hoveredBarrier}
+                onHoverBarrier={setHoveredBarrier}
+                onResizeBarrier={resizeBarrier}
+              />
+            </div>
+          )}
 
           {/* Controls + feedback */}
           <div className="flex flex-col gap-4">
@@ -884,6 +978,7 @@ export default function QuestionsPage() {
                   setHiddenCircuitRevealed(false);
                   setSelectedQubit(null);
                   setHoveredBarrier(null);
+                  setSelectedChoice(prevQ.questionType === 'mcq' ? prevQ.correctChoice : null);
                   setQuestionIndex(prevIdx);
                 }}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-sm font-semibold rounded-lg transition-colors"
@@ -911,10 +1006,12 @@ export default function QuestionsPage() {
                       setCircuitState(getAnswerCircuit(nextQ));
                       setFeedback(scores[nextIdx].points > 0 ? 'correct' : null);
                       setAnswerRevealed(true);
+                      setSelectedChoice(nextQ.questionType === 'mcq' ? nextQ.correctChoice : null);
                     } else {
                       setCircuitState(initCircuit(nextQ));
                       setFeedback(null);
                       setAnswerRevealed(false);
+                      setSelectedChoice(null);
                     }
                     setHiddenCircuitRevealed(false);
                     setSelectedQubit(null);
@@ -945,7 +1042,8 @@ export default function QuestionsPage() {
                   <>
                     <button
                       onClick={handleSubmit}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                      disabled={isMCQ && selectedChoice === null}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Submit
                     </button>
@@ -973,7 +1071,7 @@ export default function QuestionsPage() {
                 )}
                 {feedback === 'incorrect' && (
                   <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-1.5">
-                    ✗ Not quite — try a different gate
+                    {isMCQ ? '✗ Not quite — try a different option' : '✗ Not quite — try a different gate'}
                   </div>
                 )}
               </>
@@ -1004,18 +1102,20 @@ export default function QuestionsPage() {
           </div>
         </div>
 
-        {/* Right: Results Panel */}
-        <ResultsPanel
-          isReady={isReady}
-          circuit={circuitState}
-          measureStep={null}
-          selectedQubit={selectedQubit}
-          simResults={simResults}
-          shots={shots}
-          setShots={setShots}
-          onResample={() => setResampleCount(c => c + 1)}
-          scrollableCredits={true}
-        />
+        {/* Right: Results Panel (circuit questions only) */}
+        {!isMCQ && (
+          <ResultsPanel
+            isReady={isReady}
+            circuit={circuitState}
+            measureStep={null}
+            selectedQubit={selectedQubit}
+            simResults={simResults}
+            shots={shots}
+            setShots={setShots}
+            onResample={() => setResampleCount(c => c + 1)}
+            scrollableCredits={true}
+          />
+        )}
       </div>
     </div>
   );

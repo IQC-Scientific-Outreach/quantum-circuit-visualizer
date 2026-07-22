@@ -31,6 +31,12 @@ import 'katex/dist/katex.min.css';
 const SINGLE_GATES   = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
 const ALL_PALETTE_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE', 'CNOT', 'CZ', 'FF_X', 'FF_Z', 'TOFFOLI', 'BARRIER'];
 
+// ─── MCQ configuration ──────────────────────────────────────────────────────
+// Allowed range for the number of answer choices in a multiple-choice question.
+// >>> Edit these two values to change the min / max number of choices. <<<
+const MCQ_MIN_CHOICES = 2;
+const MCQ_MAX_CHOICES = 8;
+
 // Row height = h-14 (56 px) + gap-2 (8 px) = 64 px = 4 rem  (center-to-center)
 const ROW_REM = 4;
 
@@ -44,6 +50,7 @@ function newQuestion(id = 1) {
   return {
     id,
     title: '', description: '', points: 10,
+    questionType: 'circuit',   // 'circuit' (drag-and-drop) | 'mcq' (multiple choice)
     restrictToBlanks: true,
     allowedGates: ['H', 'X', 'Y', 'Z'],
     nQubits: 1, nSteps: 3,
@@ -53,6 +60,10 @@ function newQuestion(id = 1) {
     answerCircuit: makeGrid(1, 1),
     hiddenBlocks: [],
     explanation: '',
+    // ── MCQ-only fields (ignored unless questionType === 'mcq') ──
+    hideCircuit: false,        // when true, the given circuit is not shown to students
+    choices: ['', ''],         // choice text (length = number of choices)
+    correctChoice: 0,          // index of the correct choice
   };
 }
 
@@ -169,6 +180,31 @@ function serializeAnswerCircuit(circuit) {
 }
 
 function serializeQuestion(q, id) {
+  // ── Multiple-choice questions ──
+  if (q.questionType === 'mcq') {
+    const out = {
+      id, title: q.title || `Question ${id}`,
+      description: q.description, points: q.points,
+      questionType: 'mcq',
+      choices: (q.choices || []).map(c => c ?? ''),
+      correctChoice: q.correctChoice ?? 0,
+    };
+    if (q.hideCircuit) {
+      out.hideCircuit = true;                     // circuit not shipped to students
+    } else {
+      // Ship the (trimmed) given circuit purely as visual context.
+      let last = -1;
+      q.circuit.forEach(wire => {
+        for (let s = wire.length - 1; s >= 0; s--) {
+          if (wire[s] !== null) { if (s > last) last = s; break; }
+        }
+      });
+      out.circuit = q.circuit.map(wire => wire.slice(0, Math.max(0, last + 1)).map(serializeCell));
+    }
+    if (q.explanation) out.explanation = q.explanation;
+    return out;
+  }
+
   let lastOcc = -1;
   q.circuit.forEach(wire => {
     for (let s = wire.length - 1; s >= 0; s--) {
@@ -517,6 +553,22 @@ function QuestionEditor({ question: q, onChange }) {
 
   function update(patch) { onChange({ ...q, ...patch }); }
 
+  const isMCQ = q.questionType === 'mcq';
+
+  // ── MCQ helpers ─────────────────────────────────────────────────────────────
+  function setNumChoices(n) {
+    const target = Math.max(MCQ_MIN_CHOICES, Math.min(MCQ_MAX_CHOICES, n));
+    let choices = [...(q.choices || [])];
+    while (choices.length < target) choices.push('');
+    if (choices.length > target) choices = choices.slice(0, target);
+    update({ choices, correctChoice: Math.min(q.correctChoice ?? 0, choices.length - 1) });
+  }
+  function setChoiceText(i, text) {
+    const choices = [...(q.choices || [])];
+    choices[i] = text;
+    update({ choices });
+  }
+
   function handleCircuitChange(updater) {
     const prevGrid = q.circuit;
     const newCircuitRaw = typeof updater === 'function' ? updater(prevGrid) : updater;
@@ -658,17 +710,34 @@ function QuestionEditor({ question: q, onChange }) {
             <input type="number" min={1} value={q.points} onChange={e => update({ points: Number(e.target.value) })}
               className="w-24 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
           </div>
-          <div className="pb-0.5 flex flex-col gap-1">
-            <Toggle value={q.restrictToBlanks} onChange={v => update({ restrictToBlanks: v })}
-              label="Restrict student to blank slots only" />
-            <span className="text-[10px] text-slate-500 pl-11">
-              {q.restrictToBlanks ? 'Exact match evaluation mode' : 'Equivalent state evaluation mode'}
-            </span>
+          <div>
+            <label className={labelCls}>Question Type</label>
+            <div className="flex rounded-lg overflow-hidden border border-slate-600 w-fit">
+              {[['circuit', 'Drag & Drop'], ['mcq', 'Multiple Choice']].map(([value, label]) => (
+                <button key={value} onClick={() => update({ questionType: value })}
+                  className={`px-3 py-2 text-xs font-medium transition-colors ${
+                    (q.questionType || 'circuit') === value
+                      ? 'bg-blue-500/20 text-blue-300'
+                      : 'bg-slate-700 text-slate-400 hover:text-slate-200'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+          {!isMCQ && (
+            <div className="pb-0.5 flex flex-col gap-1">
+              <Toggle value={q.restrictToBlanks} onChange={v => update({ restrictToBlanks: v })}
+                label="Restrict student to blank slots only" />
+              <span className="text-[10px] text-slate-500 pl-11">
+                {q.restrictToBlanks ? 'Exact match evaluation mode' : 'Equivalent state evaluation mode'}
+              </span>
+            </div>
+          )}
         </div>
       </section>
 
       {/* ── Allowed Gates ──────────────────────────────────────────────────── */}
+      {!isMCQ && (
       <section className={sectionCls}>
         <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
           Allowed Gates&ensp;<span className="text-slate-500 normal-case font-normal">(shown in the student palette)</span>
@@ -688,30 +757,79 @@ function QuestionEditor({ question: q, onChange }) {
           <p className="text-xs text-amber-400">No gates selected — students won't have anything to place.</p>
         )}
       </section>
+      )}
 
       {/* ── Given Circuit ──────────────────────────────────────────────────── */}
       <section className={sectionCls}>
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Given Circuit</h3>
-        <p className="text-xs text-slate-400">
-          Drag gates onto the grid. Multi-qubit gates auto-place on adjacent wires — drag the nodes to reposition.
-          Use <span className="font-medium text-slate-300">Blank</span> for slots the student must fill. 
-          If you do not want to provide a circuit, set steps = 0. Ensure you do not have blank steps.
-        </p>
-        <BuilderCircuitGrid
-          gridId={`given_${q.id}`}
-          nQubits={q.nQubits} nSteps={q.nSteps} circuit={q.circuit}
-          onCellsChange={handleCircuitChange}
-          onAddWire={addWire} onRemoveWire={removeWire}
-          onAddStep={addStep} onRemoveStep={removeStep}
-          showBlanks={q.restrictToBlanks} paletteGates={ALL_PALETTE_GATES}
-        />
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Given Circuit</h3>
+          {isMCQ && (
+            <Toggle value={q.hideCircuit} onChange={v => update({ hideCircuit: v })} label="Hide circuit" />
+          )}
+        </div>
+        {isMCQ && q.hideCircuit ? (
+          <p className="text-xs text-slate-500 italic">
+            Circuit hidden — students won't see a circuit for this question.
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-slate-400">
+              Drag gates onto the grid. Multi-qubit gates auto-place on adjacent wires — drag the nodes to reposition.
+              {!isMCQ && <> Use <span className="font-medium text-slate-300">Blank</span> for slots the student must fill.</>}
+              {' '}If you do not want to provide a circuit, set steps = 0. Ensure you do not have blank steps.
+            </p>
+            <BuilderCircuitGrid
+              gridId={`given_${q.id}`}
+              nQubits={q.nQubits} nSteps={q.nSteps} circuit={q.circuit}
+              onCellsChange={handleCircuitChange}
+              onAddWire={addWire} onRemoveWire={removeWire}
+              onAddStep={addStep} onRemoveStep={removeStep}
+              showBlanks={q.restrictToBlanks && !isMCQ} paletteGates={ALL_PALETTE_GATES}
+            />
+          </>
+        )}
       </section>
 
       {/* ── Answer / Solution ──────────────────────────────────────────────── */}
       <section className={sectionCls}>
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Answer / Solution</h3>
+        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+          {isMCQ ? 'Multiple Choice Answers' : 'Answer / Solution'}
+        </h3>
 
-        {q.restrictToBlanks && (
+        {isMCQ && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 text-xs text-slate-400">
+              <span>Number of choices:</span>
+              <button onClick={() => setNumChoices((q.choices?.length || 0) - 1)}
+                disabled={(q.choices?.length || 0) <= MCQ_MIN_CHOICES} className={btnCls}>−</button>
+              <span className="text-slate-200 w-4 text-center font-medium">{q.choices?.length || 0}</span>
+              <button onClick={() => setNumChoices((q.choices?.length || 0) + 1)}
+                disabled={(q.choices?.length || 0) >= MCQ_MAX_CHOICES} className={btnCls}>+</button>
+              <span className="text-slate-500">(allowed {MCQ_MIN_CHOICES}–{MCQ_MAX_CHOICES})</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Write each choice below and select the radio button next to the correct one.
+              Markdown &amp; LaTeX (e.g. <span className="font-mono text-slate-300">$\ket0$</span>) are supported.
+            </p>
+            {(q.choices || []).map((choice, i) => (
+              <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                q.correctChoice === i
+                  ? 'bg-emerald-500/10 border-emerald-500/40'
+                  : 'bg-slate-700/60 border-slate-600/50'}`}>
+                <label className="flex items-center gap-1.5 pt-2 shrink-0 cursor-pointer" title="Mark as correct answer">
+                  <input type="radio" name={`correct-${q.id}`} checked={q.correctChoice === i}
+                    onChange={() => update({ correctChoice: i })} className="accent-emerald-500" />
+                  <span className="text-[10px] font-mono text-slate-400 w-3">{String.fromCharCode(65 + i)}</span>
+                </label>
+                <textarea value={choice} onChange={e => setChoiceText(i, e.target.value)}
+                  rows={1} placeholder={`Choice ${String.fromCharCode(65 + i)}`}
+                  className={inputCls + ' resize-none flex-1'} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isMCQ && q.restrictToBlanks && (
           <>
             <p className="text-xs text-slate-400">
               For each blank slot in the given circuit, pick the correct gate.
@@ -751,7 +869,7 @@ function QuestionEditor({ question: q, onChange }) {
           </>
         )}
 
-        {!q.restrictToBlanks && (
+        {!isMCQ && !q.restrictToBlanks && (
           <div className="space-y-4">
             <p className="text-xs text-slate-400">
               Build the reference answer circuit using only the gates students are allowed. Any circuit producing the same state is accepted.
@@ -823,6 +941,7 @@ function QuestionEditor({ question: q, onChange }) {
       </section>
 
       {/* ── Hidden Blocks (advanced) ────────────────────────────────────────── */}
+      {!isMCQ && (
       <section className={sectionCls}>
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
@@ -859,6 +978,7 @@ function QuestionEditor({ question: q, onChange }) {
           );
         })}
       </section>
+      )}
     </div>
   );
 }
@@ -922,7 +1042,18 @@ export default function QuestionBuilderPage() {
                 exactAnswer[`${ans.wireIndex}_${ans.stepIndex}`] = ans.gate;
               });
             }
-            return { ...q, id: q.id ?? (++maxId), answerNQubits: q.nQubits || 1, answerCircuit: ac.slice(0, q.nQubits || 1), exactAnswer };
+            return {
+              ...q,
+              id: q.id ?? (++maxId),
+              answerNQubits: q.nQubits || 1,
+              answerCircuit: ac.slice(0, q.nQubits || 1),
+              exactAnswer,
+              // MCQ defaults (older backups + interop safety)
+              questionType: q.questionType || 'circuit',
+              hideCircuit: q.hideCircuit ?? false,
+              choices: q.choices ?? ['', ''],
+              correctChoice: q.correctChoice ?? 0,
+            };
           });
           setQuestions(syncedData); setSelectedId(syncedData[0].id);
         } else { alert('File does not contain a valid question list.'); }
