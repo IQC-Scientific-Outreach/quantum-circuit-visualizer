@@ -345,10 +345,10 @@ function MCQChoices({ choices, selectedChoice, correctChoice, onSelect, revealed
   );
 }
 
-export default function QuestionsPage() {
+export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onComplete } = {}) {
   // ── Active question set (default = built-in, replaced when a .qpkg is loaded) ──
-  const [activeQuestions, setActiveQuestions] = useState(QUESTIONS);
-  const [quizTitle, setQuizTitle]             = useState(null); // null = practice mode
+  const [activeQuestions, setActiveQuestions] = useState(initialQuestions ?? QUESTIONS);
+  const [quizTitle, setQuizTitle]             = useState(quizMeta?.title ?? null); // null = practice mode
   const quizFileRef = useRef(null);
 
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -743,6 +743,7 @@ export default function QuestionsPage() {
   const advanceQuestion = useCallback((pointsEarned) => {
     const record     = { questionId: question.id, points: pointsEarned, usedHint: answerRevealed };
     const newScores  = [...scores, record];
+    if (scores.length === 0) onEvent?.('started'); // first answer of this run
     setScores(newScores);
     if (questionIndex + 1 < activeQuestions.length) {
       const nextIdx = questionIndex + 1;
@@ -758,7 +759,17 @@ export default function QuestionsPage() {
     } else {
       setPhase('done');
     }
-  }, [scores, question, questionIndex, answerRevealed, activeQuestions]);
+  }, [scores, question, questionIndex, answerRevealed, activeQuestions, onEvent]);
+
+  // ── Fire finished / onComplete once the quiz reaches the done phase ─────────
+  // Reuses FinalScreen's total/max computation so callers get the same numbers.
+  useEffect(() => {
+    if (phase !== 'done') return;
+    const totalPoints = scores.reduce((s, r) => s + r.points, 0);
+    const maxPoints   = activeQuestions.reduce((s, q) => s + q.points, 0);
+    onEvent?.('finished');
+    onComplete?.({ scores, totalPoints, maxPoints });
+  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── MCQ selection ─────────────────────────────────────────────────────────
   const mcqLocked = isMCQ && (questionIndex < scores.length || answerRevealed || feedback === 'correct');

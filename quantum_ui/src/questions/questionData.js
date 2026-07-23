@@ -24,7 +24,7 @@
  */
 import rawBackup from './questions.json';
 
-function parseBuilderBackup(questions) {
+export function parseBuilderBackup(questions) {
   if (!Array.isArray(questions)) return [];
   
   return questions.map((q, i) => {
