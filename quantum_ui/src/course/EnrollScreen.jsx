@@ -57,7 +57,7 @@ export default function EnrollScreen({ onEnrolled }) {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoFocus
-            placeholder="e.g. alex"
+            placeholder="Please do not use your name or sensitive information!"
             className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
           />
         </label>
