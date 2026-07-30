@@ -1,0 +1,30 @@
+[
+  {
+    
+    "id": 19,
+    "title": "Quantum Transformations",
+    "description": "We want to be able to transform one quantum state to another quantum state. Quantum **gates** are valid quantum state transformations that are given by unitary operations. \n\n\nLook at the probabilities, amplitudes, and histogram on the right. We start with each qubit (quantum bit) in the ground state $\\ket0$ with 100% probability. \nDrag and drop the $X$ gate to flip this to $\\ket1$!  ",
+    "points": 5,
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "X"
+    ],
+    "nQubits": 1,
+    "nSteps": 0,
+    "circuit": [
+      []
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        {
+          "name": "X"
+        }
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "$X$ gate is the quantum equivalent of the NOT gate for classical computers with respect to the standard basis $\\ket0, \\ket1$. It flips $\\ket0$ to $\\ket1$, and $\\ket1$ to $\\ket0$."
+  }
+]

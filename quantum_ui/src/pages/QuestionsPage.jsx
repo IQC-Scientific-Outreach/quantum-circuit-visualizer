@@ -182,7 +182,7 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelet
 
 // ─── Final score screen ───────────────────────────────────────────────────────
 
-function FinalScreen({ scores, questions, onRetry }) {
+function FinalScreen({ scores, questions, onRetry, courseMode }) {
   const totalPoints = scores.reduce((s, r) => s + r.points, 0);
   const maxPoints   = questions.reduce((s, q) => s + q.points, 0);
   const pct = maxPoints > 0 ? Math.round((totalPoints / maxPoints) * 100) : 0;
@@ -226,10 +226,10 @@ function FinalScreen({ scores, questions, onRetry }) {
           Try Again
         </button>
         <Link
-          to="/"
+          to={courseMode ? '/quizzes' : '/'}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
         >
-          Back to Visualizer
+          {courseMode ? 'Back to Quizzes' : 'Back to Visualizer'}
         </Link>
       </div>
     </div>
@@ -345,7 +345,7 @@ function MCQChoices({ choices, selectedChoice, correctChoice, onSelect, revealed
   );
 }
 
-export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onComplete } = {}) {
+export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onComplete, courseMode = false } = {}) {
   // ── Active question set (default = built-in, replaced when a .qpkg is loaded) ──
   const [activeQuestions, setActiveQuestions] = useState(initialQuestions ?? QUESTIONS);
   const [quizTitle, setQuizTitle]             = useState(quizMeta?.title ?? null); // null = practice mode
@@ -801,7 +801,7 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
 
   // ── Final screen ──────────────────────────────────────────────────────────────
   if (phase === 'done') {
-    return <FinalScreen scores={scores} questions={activeQuestions} onRetry={handleRetry} />;
+    return <FinalScreen scores={scores} questions={activeQuestions} onRetry={handleRetry} courseMode={courseMode} />;
   }
 
   const maxPoints    = activeQuestions.reduce((s, q) => s + q.points, 0);
@@ -817,9 +817,16 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
 
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <header className="bg-slate-900 border-b border-slate-700/50 flex items-center gap-4 px-5 py-3 shrink-0">
-        <Link to="/" className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0">
-          ← Visualizer
-        </Link>
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <Link to="/" className="text-slate-400 hover:text-slate-200 text-sm transition-colors">
+            ← Visualizer
+          </Link>
+          {courseMode && (
+            <Link to="/quizzes" className="text-slate-400 hover:text-slate-200 text-sm transition-colors">
+              ← Quizzes
+            </Link>
+          )}
+        </div>
 
         <span className="text-slate-700 select-none">|</span>
 
@@ -828,8 +835,8 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
           {quizTitle ?? 'Practice Questions'}
         </h1>
 
-        {/* Back to practice (only when a quiz file is loaded) */}
-        {quizTitle && (
+        {/* Back to practice (only when a quiz file is loaded — practice mode only) */}
+        {quizTitle && !courseMode && (
           <button
             onClick={() => { setQuizTitle(null); startQuiz(QUESTIONS); }}
             className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0"
@@ -838,19 +845,25 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
           </button>
         )}
 
-        <Link to="/builder" className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0">
-          Question Builder →
-        </Link>
+        {!courseMode && (
+          <Link to="/builder" className="text-slate-500 hover:text-slate-200 text-xs transition-colors shrink-0">
+            Question Builder →
+          </Link>
+        )}
 
-        {/* Load quiz file */}
-        <input ref={quizFileRef} type="file" accept=".qpkg" onChange={handleLoadQuizFile} className="hidden" />
-        <button
-          onClick={() => quizFileRef.current?.click()}
-          className="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors shrink-0"
-          title="Load a .qpkg quiz file from your teacher"
-        >
-          ↑ Load Quiz File
-        </button>
+        {/* Load quiz file (practice mode only) */}
+        {!courseMode && (
+          <>
+            <input ref={quizFileRef} type="file" accept=".qpkg" onChange={handleLoadQuizFile} className="hidden" />
+            <button
+              onClick={() => quizFileRef.current?.click()}
+              className="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors shrink-0"
+              title="Load a .qpkg quiz file from your teacher"
+            >
+              ↑ Load Quiz File
+            </button>
+          </>
+        )}
 
         <div className="flex-1" />
 

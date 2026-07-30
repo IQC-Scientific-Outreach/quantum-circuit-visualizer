@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "questionType": "mcq",
+    "title": "Quiz 3 — sample question",
+    "description": "Placeholder question for Quiz 3. Replace this file with a \"Save JSON backup\" export from the Question Builder once the real content is ready.",
+    "points": 10,
+    "choices": [
+      "Placeholder answer A",
+      "Placeholder answer B",
+      "Placeholder answer C"
+    ],
+    "correctChoice": 2,
+    "hideCircuit": true,
+    "explanation": "Placeholder explanation for Quiz 3."
+  }
+]

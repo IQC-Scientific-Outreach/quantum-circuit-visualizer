@@ -65,10 +65,11 @@ export default function EnrollScreen({ onEnrolled }) {
         <label className="flex flex-col gap-1.5">
           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Class code</span>
           <input
-            type="password"
+            type="text"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="••••••"
+            autoComplete="off"
+            placeholder="class code"
             className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
           />
         </label>
