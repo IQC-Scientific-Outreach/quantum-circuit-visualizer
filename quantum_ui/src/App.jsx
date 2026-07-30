@@ -211,16 +211,16 @@ function App() {
           <h1 className="text-sm font-semibold text-white tracking-tight leading-tight">Circuit Visualizer</h1>
           {!isReady && <p className="text-[10px] text-amber-400 animate-pulse mt-0.5">Initializing…</p>}
           <Link
-            to="/questions"
-            className="text-[15px] text-blue-400 hover:text-blue-300 transition-colors mt-1.5 block"
-          >
-            Learn with Circuits →
-          </Link>
-          <Link
             to="/builder"
-            className="text-[13px] text-slate-500 hover:text-slate-300 transition-colors mt-0.5 block"
+            className="text-[13px] text-slate-500 hover:text-slate-300 transition-colors mt-1.5 block"
           >
             Question Builder →
+          </Link>
+          <Link
+            to="/quizzes"
+            className="mt-2.5 inline-block px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            Access Quizzes →
           </Link>
         </div>
 

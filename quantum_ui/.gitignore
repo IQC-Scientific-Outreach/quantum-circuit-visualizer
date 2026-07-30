@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local env (secrets: SUPABASE_*, CLASS_CODE) — never commit
+.env
+.env.*
+!.env.example
