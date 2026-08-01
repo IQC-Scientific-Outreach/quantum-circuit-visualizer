@@ -1,17 +1,52 @@
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { QUIZZES } from '../questions/quizCatalog';
+import { QUIZZES } from '../questions/quizManifest';
 import { getStudent, clearStudent } from './identity';
+import { getAvailableQuizzes, getProgress } from './api';
 
-// Student dashboard (/quizzes). Lists the quizzes from the catalog; clicking one
-// opens the player at /quiz/:slug. Per-quiz best score + completion badges come
-// later (Phase 6, from /api/progress).
+// Student dashboard (/quizzes). Lists quizzes from the manifest; a Supabase-backed
+// availability list decides which are unlocked, and per-quiz progress shows best %,
+// completion, or an in-progress marker. Locked quizzes are greyed and non-clickable.
 export default function QuizCatalogPage() {
   const navigate = useNavigate();
   const student = getStudent();
+  const [availability, setAvailability] = useState(null); // { configured, available:[] } | null
+  const [progress, setProgress] = useState({});           // slug -> row
+
+  useEffect(() => {
+    let alive = true;
+    getAvailableQuizzes().then((r) => { if (alive) setAvailability(r); });
+    if (student?.username) {
+      getProgress(student.username).then((r) => { if (alive && r?.progress) setProgress(r.progress); });
+    }
+    return () => { alive = false; };
+  }, [student?.username]);
 
   function handleLogout() {
     clearStudent();
     navigate('/');
+  }
+
+  // Locked only when availability is configured AND the slug isn't in the unlocked list.
+  // Unconfigured / failed fetch → everything unlocked (dev fallback).
+  const configured = !!availability?.configured;
+  const availableSet = new Set(availability?.available || []);
+  const isLocked = (slug) => configured && !availableSet.has(slug);
+
+  function badge(slug) {
+    const p = progress[slug];
+    if (!p) return null;
+    if (p.everCompleted) {
+      return <span className="text-xs text-emerald-400">✓ Completed · best {p.bestPct}%</span>;
+    }
+    if (p.inProgress) {
+      return (
+        <span className="text-xs text-amber-400">
+          In progress · {p.questionsAnswered}/{p.totalQuestions}
+        </span>
+      );
+    }
+    return null;
   }
 
   return (
@@ -40,25 +75,50 @@ export default function QuizCatalogPage() {
         </p>
 
         <div className="grid gap-3">
-          {QUIZZES.map((quiz, i) => (
-            <Link
-              key={quiz.slug}
-              to={`/quiz/${quiz.slug}`}
-              className="group flex items-center justify-between gap-4 bg-slate-900 border border-slate-700/50 rounded-xl p-4 hover:border-blue-500/60 transition-colors"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-slate-500">{String(i + 1).padStart(2, '0')}</span>
-                  <h2 className="text-base font-semibold text-white truncate">{quiz.title}</h2>
+          {QUIZZES.map((quiz, i) => {
+            const num = String(i + 1).padStart(2, '0');
+            const locked = isLocked(quiz.slug);
+
+            const inner = (
+              <>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono text-slate-500">{num}</span>
+                    <h2 className="text-base font-semibold text-white truncate">{quiz.title}</h2>
+                  </div>
+                  {quiz.description && <p className="text-sm text-slate-400 mt-1">{quiz.description}</p>}
+                  <div className="mt-1.5">
+                    {locked
+                      ? <span className="text-xs text-slate-500">🔒 Locked</span>
+                      : badge(quiz.slug)}
+                  </div>
                 </div>
-                {quiz.description && <p className="text-sm text-slate-400 mt-1">{quiz.description}</p>}
-                <p className="text-[11px] text-slate-600 mt-1">
-                  {quiz.questions.length} question{quiz.questions.length === 1 ? '' : 's'}
-                </p>
+                <span className={`shrink-0 ${locked ? 'text-slate-600' : 'text-blue-400 group-hover:translate-x-0.5 transition-transform'}`}>
+                  {locked ? '🔒' : '→'}
+                </span>
+              </>
+            );
+
+            const base = 'flex items-center justify-between gap-4 rounded-xl p-4 border';
+
+            return locked ? (
+              <div
+                key={quiz.slug}
+                className={`${base} bg-slate-900 border-slate-800 opacity-60 cursor-not-allowed`}
+                title="Not unlocked yet"
+              >
+                {inner}
               </div>
-              <span className="shrink-0 text-blue-400 group-hover:translate-x-0.5 transition-transform">→</span>
-            </Link>
-          ))}
+            ) : (
+              <Link
+                key={quiz.slug}
+                to={`/quiz/${quiz.slug}`}
+                className={`group ${base} bg-slate-900 border-slate-700/50 hover:border-blue-500/60 transition-colors`}
+              >
+                {inner}
+              </Link>
+            );
+          })}
         </div>
       </main>
     </div>

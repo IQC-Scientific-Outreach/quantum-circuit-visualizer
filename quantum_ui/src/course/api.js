@@ -1,6 +1,5 @@
-// Best-effort client wrappers for the course tracking endpoints. Failures are
-// swallowed so tracking never blocks a student from taking a quiz (e.g. before
-// Supabase env vars are configured, or when `vercel dev` isn't running).
+// Best-effort client wrappers for the course endpoints. Failures are swallowed so a quiz
+// always plays, even before Supabase env vars are set or when `vercel dev` isn't running.
 
 async function postJSON(url, body) {
   try {
@@ -15,20 +14,38 @@ async function postJSON(url, body) {
   }
 }
 
-// event ∈ 'opened' | 'started' | 'finished'
-export function track({ username, quizSlug, event }) {
-  return postJSON('/api/track', { username, quizSlug, event });
-}
-
-export function saveScore({ username, quizSlug, score, maxScore }) {
-  return postJSON('/api/score', { username, quizSlug, score, maxScore });
-}
-
-export async function getProgress(username) {
+async function getJSON(url) {
   try {
-    const res = await fetch(`/api/progress?username=${encodeURIComponent(username)}`);
-    return res.ok ? await res.json().catch(() => null) : null;
+    const res = await fetch(url);
+    const data = await res.json().catch(() => null);
+    return { status: res.status, data };
   } catch {
-    return null;
+    return { status: 0, data: null };
   }
+}
+
+// Upsert the student's live progress for one quiz (fired on open and after each question).
+// payload: { username, quizSlug, totalQuestions, maxPoints, questionsAnswered, points,
+//            perQuestion, completed }
+export function saveProgress(payload) {
+  return postJSON('/api/progress', payload);
+}
+
+// → { configured, progress: { slug: { bestPct, everCompleted, inProgress,
+//     questionsAnswered, totalQuestions, points, maxPoints, perQuestion } } } | null
+export async function getProgress(username) {
+  const { data } = await getJSON(`/api/progress?username=${encodeURIComponent(username)}`);
+  return data;
+}
+
+// → { status, backup? }  (200 with raw backup, 403 locked, 404 not found)
+export async function getQuiz(slug) {
+  const { status, data } = await getJSON(`/api/quiz/${encodeURIComponent(slug)}`);
+  return { status, ...(data || {}) };
+}
+
+// → { configured, available: [slug…] } | null
+export async function getAvailableQuizzes() {
+  const { data } = await getJSON('/api/quizzes');
+  return data;
 }

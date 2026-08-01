@@ -345,14 +345,14 @@ function MCQChoices({ choices, selectedChoice, correctChoice, onSelect, revealed
   );
 }
 
-export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onComplete, courseMode = false } = {}) {
+export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onComplete, onProgress, courseMode = false, initialQuestionIndex, initialScores } = {}) {
   // ── Active question set (default = built-in, replaced when a .qpkg is loaded) ──
   const [activeQuestions, setActiveQuestions] = useState(initialQuestions ?? QUESTIONS);
   const [quizTitle, setQuizTitle]             = useState(quizMeta?.title ?? null); // null = practice mode
   const quizFileRef = useRef(null);
 
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [scores, setScores]               = useState([]);
+  const [questionIndex, setQuestionIndex] = useState(initialQuestionIndex ?? 0);
+  const [scores, setScores]               = useState(initialScores ?? []);
   const [phase, setPhase]                 = useState('playing');
 
   const question = activeQuestions[questionIndex];
@@ -745,6 +745,16 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
     const newScores  = [...scores, record];
     if (scores.length === 0) onEvent?.('started'); // first answer of this run
     setScores(newScores);
+    // Incremental progress: fire after every answered question (incl. the last) so a
+    // student who quits mid-quiz still leaves a record and can resume.
+    onProgress?.({
+      questionsAnswered: newScores.length,
+      totalQuestions: activeQuestions.length,
+      points: newScores.reduce((s, r) => s + r.points, 0),
+      maxPoints: activeQuestions.reduce((s, q) => s + q.points, 0),
+      perQuestion: newScores.map((r) => r.points),
+      completed: newScores.length >= activeQuestions.length,
+    });
     if (questionIndex + 1 < activeQuestions.length) {
       const nextIdx = questionIndex + 1;
       const nextQ = activeQuestions[nextIdx];
@@ -759,7 +769,7 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
     } else {
       setPhase('done');
     }
-  }, [scores, question, questionIndex, answerRevealed, activeQuestions, onEvent]);
+  }, [scores, question, questionIndex, answerRevealed, activeQuestions, onEvent, onProgress]);
 
   // ── Fire finished / onComplete once the quiz reaches the done phase ─────────
   // Reuses FinalScreen's total/max computation so callers get the same numbers.
