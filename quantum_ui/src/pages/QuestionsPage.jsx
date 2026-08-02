@@ -354,6 +354,8 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
   const [questionIndex, setQuestionIndex] = useState(initialQuestionIndex ?? 0);
   const [scores, setScores]               = useState(initialScores ?? []);
   const [phase, setPhase]                 = useState('playing');
+  // Wrong-submission count per question index (ref → no re-render, survives back/forth nav).
+  const wrongTriesRef = useRef({});
 
   const question = activeQuestions[questionIndex];
 
@@ -741,18 +743,19 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
 
   // ── Advance to next question ─────────────────────────────────────────────────
   const advanceQuestion = useCallback((pointsEarned) => {
-    const record     = { questionId: question.id, points: pointsEarned, usedHint: answerRevealed };
+    const record     = { questionId: question.id, points: pointsEarned, usedHint: answerRevealed, wrongTries: wrongTriesRef.current[questionIndex] || 0 };
     const newScores  = [...scores, record];
     if (scores.length === 0) onEvent?.('started'); // first answer of this run
     setScores(newScores);
     // Incremental progress: fire after every answered question (incl. the last) so a
-    // student who quits mid-quiz still leaves a record and can resume.
+    // student who quits mid-quiz still leaves a record and can resume. Per-question shape
+    // { id, points, revealed, wrongTries } powers the console analytics.
     onProgress?.({
       questionsAnswered: newScores.length,
       totalQuestions: activeQuestions.length,
       points: newScores.reduce((s, r) => s + r.points, 0),
       maxPoints: activeQuestions.reduce((s, q) => s + q.points, 0),
-      perQuestion: newScores.map((r) => r.points),
+      perQuestion: newScores.map((r) => ({ id: r.questionId, points: r.points, revealed: r.usedHint, wrongTries: r.wrongTries || 0 })),
       completed: newScores.length >= activeQuestions.length,
     });
     if (questionIndex + 1 < activeQuestions.length) {
@@ -792,6 +795,9 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
   const handleSubmit = () => {
     if (answerRevealed) { advanceQuestion(0); return; }
     const correct = isMCQ ? (selectedChoice === question.correctChoice) : checkCorrect();
+    if (!correct) {
+      wrongTriesRef.current[questionIndex] = (wrongTriesRef.current[questionIndex] || 0) + 1;
+    }
     setFeedback(correct ? 'correct' : 'incorrect');
   };
 

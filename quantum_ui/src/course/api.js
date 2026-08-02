@@ -24,17 +24,19 @@ async function getJSON(url) {
   }
 }
 
-// Upsert the student's live progress for one quiz (fired on open and after each question).
-// payload: { username, quizSlug, totalQuestions, maxPoints, questionsAnswered, points,
-//            perQuestion, completed }
+// Upsert one attempt's live progress (fired on open and after each question).
+// payload: { username, quizSlug, attemptNo, totalQuestions, maxPoints, questionsAnswered,
+//            points, perQuestion, completed }
 export function saveProgress(payload) {
   return postJSON('/api/progress', payload);
 }
 
-// → { configured, progress: { slug: { bestPct, everCompleted, inProgress,
-//     questionsAnswered, totalQuestions, points, maxPoints, perQuestion } } } | null
-export async function getProgress(username) {
-  const { data } = await getJSON(`/api/progress?username=${encodeURIComponent(username)}`);
+// For the player: the latest in-progress attempt to resume, plus the highest attempt number so
+// far (to compute the next one). → { configured, maxAttemptNo, resume|null } | null
+export async function getResume(username, quizSlug) {
+  const { data } = await getJSON(
+    `/api/progress?username=${encodeURIComponent(username)}&quizSlug=${encodeURIComponent(quizSlug)}`
+  );
   return data;
 }
 
