@@ -44,8 +44,9 @@ export async function getQuiz(slug) {
   return { status, ...(data || {}) };
 }
 
-// → { configured, available: [slug…] } | null
-export async function getAvailableQuizzes() {
-  const { data } = await getJSON('/api/quizzes');
+// Everything the dashboard needs in one round-trip.
+// → { configured, available: [slug…], progress: { slug: {...} } } | null
+export async function getDashboard(username) {
+  const { data } = await getJSON(`/api/dashboard?username=${encodeURIComponent(username)}`);
   return data;
 }
