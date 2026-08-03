@@ -63,7 +63,7 @@ export default function CourseQuizPage() {
           initialScores = r.perQuestion.map((e, i) =>
             typeof e === 'number'
               ? { questionId: questions[i]?.id, points: e, usedHint: false, wrongTries: 0 }
-              : { questionId: e.id, points: e.points, usedHint: e.revealed, wrongTries: e.wrongTries || 0 }
+              : { questionId: e.id, points: e.points, usedHint: e.revealed, wrongTries: e.wrongTries || 0, ...(e.wrongChoices ? { wrongChoices: e.wrongChoices } : {}) }
           );
         } else {
           attemptNo = Math.min((pr?.maxAttemptNo || 0) + 1, MAX_ATTEMPTS);

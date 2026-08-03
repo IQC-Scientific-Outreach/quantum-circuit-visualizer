@@ -356,6 +356,8 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
   const [phase, setPhase]                 = useState('playing');
   // Wrong-submission count per question index (ref → no re-render, survives back/forth nav).
   const wrongTriesRef = useRef({});
+  // MCQ only: the wrong choice indices picked per question index, in order.
+  const wrongChoicesRef = useRef({});
 
   const question = activeQuestions[questionIndex];
 
@@ -744,6 +746,7 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
   // ── Advance to next question ─────────────────────────────────────────────────
   const advanceQuestion = useCallback((pointsEarned) => {
     const record     = { questionId: question.id, points: pointsEarned, usedHint: answerRevealed, wrongTries: wrongTriesRef.current[questionIndex] || 0 };
+    if (question.questionType === 'mcq') record.wrongChoices = wrongChoicesRef.current[questionIndex] || [];
     const newScores  = [...scores, record];
     if (scores.length === 0) onEvent?.('started'); // first answer of this run
     setScores(newScores);
@@ -755,7 +758,7 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
       totalQuestions: activeQuestions.length,
       points: newScores.reduce((s, r) => s + r.points, 0),
       maxPoints: activeQuestions.reduce((s, q) => s + q.points, 0),
-      perQuestion: newScores.map((r) => ({ id: r.questionId, points: r.points, revealed: r.usedHint, wrongTries: r.wrongTries || 0 })),
+      perQuestion: newScores.map((r) => ({ id: r.questionId, points: r.points, revealed: r.usedHint, wrongTries: r.wrongTries || 0, ...(r.wrongChoices ? { wrongChoices: r.wrongChoices } : {}) })),
       completed: newScores.length >= activeQuestions.length,
     });
     if (questionIndex + 1 < activeQuestions.length) {
@@ -797,6 +800,10 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
     const correct = isMCQ ? (selectedChoice === question.correctChoice) : checkCorrect();
     if (!correct) {
       wrongTriesRef.current[questionIndex] = (wrongTriesRef.current[questionIndex] || 0) + 1;
+      // MCQ only: remember which wrong option was picked (for distractor analysis).
+      if (isMCQ && selectedChoice != null) {
+        wrongChoicesRef.current[questionIndex] = [...(wrongChoicesRef.current[questionIndex] || []), selectedChoice];
+      }
     }
     setFeedback(correct ? 'correct' : 'incorrect');
   };

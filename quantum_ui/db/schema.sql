@@ -16,9 +16,11 @@
 --    read time (dashboard.js + the analytics queries), so nothing derivable is
 --    duplicated in the DB.
 --  • per_question is a compact jsonb array, one entry per answered question:
---      [{ "id": <question id>, "points": <int>, "revealed": <bool>, "wrongTries": <int> }, …]
---    % attempted / correct / gave-up / unattempted and per-question "themes" all
---    derive from this field.
+--      [{ "id": <question id>, "points": <int>, "revealed": <bool>, "wrongTries": <int>,
+--         "wrongChoices": [<choice index>, …]   ← MCQ ONLY: wrong options picked, in order
+--       }, …]
+--    % attempted / correct / gave-up / unattempted, per-question "themes", and MCQ
+--    distractor analysis (which wrong options got picked) all derive from this field.
 --
 -- Migrating from an earlier schema? If you previously created the single-row
 -- `progress` table (or the original `events`/`attempts` tables), drop them first —
