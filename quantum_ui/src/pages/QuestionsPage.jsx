@@ -368,6 +368,8 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
   const [selectedChoice,  setSelectedChoice]  = useState(null);
 
   const isMCQ = question.questionType === 'mcq';
+  // MCQ questions that keep a (non-hidden) circuit render it read-only, plus its results panel.
+  const showMcqCircuit = isMCQ && !question.hideCircuit && question.circuit && question.circuit.some(w => w.length > 0);
 
   const [engine,   setEngine]   = useState(null);
   const [isReady,  setIsReady]  = useState(false);
@@ -420,14 +422,14 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
 
   // ── ✅ Good: Calculate derived data during rendering and cache expensive WASM calls
   const simResults = useMemo(() => {
-    if (!isReady || !engine || isMCQ) return null;
+    if (!isReady || !engine || (isMCQ && !showMcqCircuit)) return null;
     const normalizedCircuit = circuitState.map(wire => wire.map(cell => {
       if (!cell) return null;
       if (cell.blank) return cell.filled ? { ...cell, name: cell.filled } : null;
       return { ...cell };
     }));
     return simulateCircuit(engine, normalizedCircuit, null, shots, selectedQubit);
-  }, [isReady, engine, isMCQ, circuitState, shots, selectedQubit, resampleCount]);
+  }, [isReady, engine, isMCQ, showMcqCircuit, circuitState, shots, selectedQubit, resampleCount]);
 
   // ── Adjust state during render: Auto-expand circuit empty buffer slots ──────
   const [prevCircuitForResize, setPrevCircuitForResize] = useState(circuitState);
@@ -832,8 +834,6 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
 
   // For equivalent-circuit questions: show a separator after the given circuit
   const separatorStep = (!isMCQ && !question.restrictToBlanks) ? question.circuit[0].length : undefined;
-  // MCQ questions that opted to keep a circuit render it read-only above the choices
-  const showMcqCircuit = isMCQ && !question.hideCircuit && question.circuit && question.circuit.some(w => w.length > 0);
 
   return (
     <div className="fixed inset-0 w-full flex flex-col font-sans text-slate-300 bg-slate-950">
@@ -1149,8 +1149,8 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
           </div>
         </div>
 
-        {/* Right: Results Panel (circuit questions only) */}
-        {!isMCQ && (
+        {/* Right: Results Panel — circuit questions, and MCQs that show their circuit */}
+        {(!isMCQ || showMcqCircuit) && (
           <ResultsPanel
             isReady={isReady}
             circuit={circuitState}
