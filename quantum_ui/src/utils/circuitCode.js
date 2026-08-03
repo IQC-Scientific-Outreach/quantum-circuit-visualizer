@@ -2,14 +2,14 @@ import { TWO_WIRE_GATES as TWO_WIRE, THREE_WIRE_GATES as THREE_WIRE } from '../c
 
 // Gate name → short code
 const GATE_TO_CODE = {
-  H: 'h', X: 'x', Y: 'y', Z: 'z', T: 't',
+  I: 'i', H: 'h', X: 'x', Y: 'y', Z: 'z', T: 't',
   MEASURE: 'm', CNOT: 'cx', CZ: 'cz', FF_X: 'ffx', FF_Z: 'ffz',
   TOFFOLI: 'ccx', BARRIER: 'barrier',
 };
 
 // Short code (and aliases) → gate name
 const CODE_TO_GATE = {
-  h: 'H', x: 'X', y: 'Y', z: 'Z', t: 'T',
+  i: 'I', h: 'H', x: 'X', y: 'Y', z: 'Z', t: 'T',
   m: 'MEASURE', measure: 'MEASURE',
   cx: 'CNOT', cnot: 'CNOT',
   cz: 'CZ',

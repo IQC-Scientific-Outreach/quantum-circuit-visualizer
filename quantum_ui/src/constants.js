@@ -1,6 +1,6 @@
 export const MAX_QUBITS = 10;
 
-export const SINGLE_QUBIT_GATES   = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
+export const SINGLE_QUBIT_GATES   = ['I', 'H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
 export const TWO_WIRE_GATES       = ['CNOT', 'CZ', 'FF_X', 'FF_Z'];
 export const THREE_WIRE_GATES     = ['TOFFOLI'];
 export const BARRIER_GATE         = 'BARRIER';
@@ -12,6 +12,7 @@ export const MULTI_WIRE_GATES     = [...TWO_WIRE_GATES, ...THREE_WIRE_GATES, BAR
 export const CLASSICAL_CTRL_GATES = ['FF_X', 'FF_Z'];
 
 export const GATE_STYLES = {
+  I:       'bg-slate-500/20 border-slate-400/70 text-slate-300',
   H:       'bg-sky-500/20 border-sky-400/70 text-sky-300',
   X:       'bg-teal-500/20 border-teal-400/70 text-teal-300',
   Y:       'bg-violet-500/20 border-violet-400/70 text-violet-300',
