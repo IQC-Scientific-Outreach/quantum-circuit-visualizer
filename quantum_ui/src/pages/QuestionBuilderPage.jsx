@@ -201,6 +201,7 @@ function serializeQuestion(q, id) {
         }
       });
       out.circuit = q.circuit.map(wire => wire.slice(0, Math.max(0, last + 1)).map(serializeCell));
+      if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
     }
     if (q.hideResults) out.hideResults = true;
     if (q.explanation) out.explanation = q.explanation;
@@ -951,7 +952,8 @@ function QuestionEditor({ question: q, onChange }) {
       </section>
 
       {/* ── Hidden Blocks (advanced) ────────────────────────────────────────── */}
-      {!isMCQ && (
+      {/* Available for circuit questions and for MCQs that show a circuit. */}
+      {(!isMCQ || !q.hideCircuit) && (
       <section className={sectionCls}>
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
@@ -1060,6 +1062,7 @@ export default function QuestionBuilderPage() {
               exactAnswer,
               // MCQ defaults (older backups + interop safety)
               questionType: q.questionType || 'circuit',
+              hiddenBlocks: q.hiddenBlocks ?? [],
               hideResults: q.hideResults ?? false,
               hideCircuit: q.hideCircuit ?? false,
               choices: q.choices ?? ['', ''],

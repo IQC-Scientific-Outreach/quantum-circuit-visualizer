@@ -47,6 +47,7 @@ export function parseBuilderBackup(questions) {
         out.circuit = q.circuit.map(wire =>
           wire.map(cell => (cell ? { ...cell, locked: true } : null))
         );
+        if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
       }
       if (q.hideResults) out.hideResults = true;
       if (q.explanation) out.explanation = q.explanation;
