@@ -1,55 +1,266 @@
 [
   {
-    
-    "id": 19,
-    "title": "Quantum Transformations",
-    "description": "We want to be able to transform one quantum state to another quantum state. Quantum **gates** are valid quantum state transformations that are given by unitary operations. \n\n\nLook at the probabilities, amplitudes, and histogram on the right. We start with each qubit (quantum bit) in the ground state $\\ket0$ with 100% probability. \nDrag and drop the $X$ gate to flip this to $\\ket1$!  ",
-    "points": 5,
-    "restrictToBlanks": false,
+    "id": 5,
+    "title": "Superposition and Measurement",
+    "description": "One qubit is in a superposition of the states $\\ket{0}$ and $\\ket{1}$. What quantum state will it be in after measurement in the 0/1 basis?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
     "allowedGates": [
-      "X"
+      "H",
+      "X",
+      "Y",
+      "Z"
     ],
     "nQubits": 1,
-    "nSteps": 0,
+    "nSteps": 2,
     "circuit": [
-      []
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
     ],
     "exactAnswer": {},
     "answerNQubits": 1,
     "answerNSteps": 1,
     "answerCircuit": [
       [
-        {
-          "name": "X"
-        }
+        null
       ]
     ],
     "hiddenBlocks": [],
-    "explanation": "$X$ gate is the quantum equivalent of the NOT gate for classical computers with respect to the standard basis $\\ket0, \\ket1$. It flips $\\ket0$ to $\\ket1$, and $\\ket1$ to $\\ket0$."
-  },
-
-  {
-    "id": 5,
-    "title": "X gate",
-    "description": "The $X$ gate you just saw transforms $$\\ket 0$$ into $$\\ket 1$$, and $$\\ket 1$$ into $$\\ket 0$$. It is thus the quantum equivalent of the NOT gate for classical computers.\n \nIt is represented as $$X = \\begin{bmatrix} 0 & 1 \\\\ 1 & 0 \\end{bmatrix} = \\ket0\\bra1 + \\ket1\\bra0$$\n\n\nIn this circuit, the state after the hidden elements is $\\ket{01}$ as seen in the results panel. Drag and drop the correct gates to transform the circuit to $\\ket{10}$",
-    "points": 10,
-    "restrictToBlanks": false,
-    "allowedGates": [
-      "X"
+    "explanation": "When we measure the qubit in the 0/1 basis, we receive an output of 0 or 1 and collapse the qubit to that state.",
+    "hideCircuit": false,
+    "choices": [
+      "The qubit will be in both state 0 and 1",
+      "The qubit will be in either state 0 or 1",
+      "The qubit will be in neither state 0 nor state 1",
+      "the qubit will remain in state 0 or state 1"
     ],
-    "nQubits": 2,
-    "nSteps": 1,
+    "correctChoice": 1
+  },
+  {
+    "id": 7,
+    "title": "Superposition and measurement",
+    "description": "A qubit starts in an unknown superposition state. An H gate is applied, followed by a measurement in the 0/1 basis. How can the qubit be returned to its original unknown state after measurement?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 1,
+    "nSteps": 2,
     "circuit": [
       [
         {
-          "name": "BARRIER",
-          "topWire": 0,
-          "bottomWire": 0
+          "name": "H"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "Once we measure the qubit, we collapse the state, irreversibly changing it. It is not possible unless we can re-prepare the qubit in the initial state from scratch.",
+    "hideCircuit": true,
+    "choices": [
+      "Apply another H gate and measure again",
+      "Apply another H gate and do not measure",
+      "Measure the qubit again and then apply an H gate",
+      "It is not possible to recover the initial unknown state"
+    ],
+    "correctChoice": 3
+  },
+  {
+    "id": 1,
+    "title": "Qubit measurement",
+    "description": "A qubit starts in the 0 state and then has an H gate applied to it. If we measure the qubit, what is the probability we find it in the state \"0\"?\n\nYou may wish to open the circuit simulator in another window to test the circuit before answering.",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Z",
+      "Y"
+    ],
+    "nQubits": 1,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "The Hadamard transforms the state to the $|+\\rangle$ state, which is a 50/50 superposition of $|0\\rangle$ and $|1\\rangle$.",
+    "hideCircuit": false,
+    "choices": [
+      "0%",
+      "Between 1% and 49%",
+      "50%",
+      "Between 51% and 99%",
+      "100%"
+    ],
+    "correctChoice": 2
+  },
+  {
+    "id": 2,
+    "title": "Qubit measurement",
+    "description": "A qubit starts in the 0 state and then has two H gates applied to it. If we measure the qubit, what is the probability we find it in the state \"0\"? You may use the histogram on the right panel to help answer this question.\nYou may wish to open the circuit simulator in another window to test the circuit before answering.",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 1,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "H"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "Two Hadamards cancel each other out, returning the qubit to the $|0\\rangle$ state.",
+    "hideCircuit": false,
+    "choices": [
+      "0%",
+      "Between 1% and 49%",
+      "50%",
+      "Between 51% and 99%",
+      "100%"
+    ],
+    "correctChoice": 4
+  },
+  {
+    "id": 3,
+    "title": "Qubit measurement",
+    "description": "A qubit starts in the 0 state and then has two H gates applied to it with one T gate in the middle. If we measure the qubit, what is the probability we find it in the state \"0\"? You may use the histogram on the right panel to help answer this question.\n\nYou may wish to open the circuit simulator in another window to test the circuit before answering.",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 1,
+    "nSteps": 4,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "T"
+        },
+        {
+          "name": "H"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "The T gate applies a phase of $\\pi/4$ to the $\\ket{1}$ component. This changes the state, and the second Hadamard no longer transforms the state exactly to the $\\ket{0}$ state.",
+    "hideCircuit": false,
+    "choices": [
+      "0%",
+      "Between 1% and 49%",
+      "50%",
+      "Between 51% and 99%",
+      "100%"
+    ],
+    "correctChoice": 3
+  },
+  {
+    "id": 4,
+    "title": "Circuit comparisons",
+    "description": "We have two qubits, both starting in the $\\ket{0}$ state with two gates applied on each. Which statement about the two circuits is true?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 2,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "Z"
         }
       ],
       [
         {
           "name": "X"
+        },
+        {
+          "name": "H"
         }
       ]
     ],
@@ -58,24 +269,239 @@
     "answerNSteps": 1,
     "answerCircuit": [
       [
-        {
-          "name": "X"
-        }
+        null
       ],
       [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "These two circuits perform the same operation and both output the state $\\ket{-}$, as can be seen by showing that $HX=ZH$.",
+    "hideCircuit": false,
+    "choices": [
+      "The first qubit is more likely to be found as \"0\" than the second qubit",
+      "The second qubit is more likely to be found as \"0\" than the first qubit",
+      "The output states are opposite superposition states",
+      "The output states of the circuit are the same"
+    ],
+    "correctChoice": 3
+  },
+  {
+    "id": 6,
+    "title": "Circuit Representation",
+    "description": "How would you express the below circuit in bra-ket notation? Note that the starting state is $\\ket{0}$ by default.",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "T"
+    ],
+    "nQubits": 1,
+    "nSteps": 3,
+    "circuit": [
+      [
         {
-          "name": "X"
+          "name": "Z"
+        },
+        {
+          "name": "H"
+        },
+        {
+          "name": "Y"
         }
       ]
     ],
-    "hiddenBlocks": [
-      {
-        "topWire": 0,
-        "bottomWire": 1,
-        "startStep": 0,
-        "endStep": 0
-      }
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
     ],
-    "explanation": "Note that the $X$ gate are *involutory*, which means that applying them twice effectively does nothing! You'll notice this later in many of our other gates as well."
+    "hiddenBlocks": [],
+    "explanation": "You can think about both $YHZ\\ket{0}$ and the circuit as starting with the state $\\ket{0}$ and applying the gate $Z$, then $H$, then $Y$.",
+    "hideCircuit": false,
+    "choices": [
+      "$ZHY\\ket{0}$",
+      "$YHZ\\ket{0}$",
+      "$\\ket{0}HYZ$",
+      "$\\ket{0}ZHY$",
+      "$\\bra{0}ZHY\\ket{0}$",
+      "$\\bra{0}YHZ\\ket{0}$"
+    ],
+    "correctChoice": 1
+  },
+  {
+    "id": 10,
+    "title": "Circuit Representation",
+    "description": "Drag-and-drop gates to represent the circuit $TYX\\ket{0}$.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "T"
+    ],
+    "nQubits": 1,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "X",
+      "0_1": "Y",
+      "0_2": "T"
+    },
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "",
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0
+  },
+  {
+    "id": 8,
+    "title": "Equivalent gates",
+    "description": "The $X$ gate switches $\\ket{0}$ and $\\ket{1}$ components, like the classical NOT operation. Can you make an $X$ gate using only $H$ and $Z$? Drag and drop gates into the circuit to build your gate.\nRecall that $Z$ applies a $\\pi$ phase shift to the $\\ket{1}$ component.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "Z"
+    ],
+    "nQubits": 1,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "H",
+      "0_1": "Z",
+      "0_2": "H"
+    },
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "$HZH=X$. Another way to think about this is that the $Z$ gate flips the $\\ket{+}$ and $\\ket{-}$ states, so by transforming into the $+/-$ basis, we can use the $Z$ as a NOT operation.",
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0
+  },
+  {
+    "id": 9,
+    "title": "Equivalent gates",
+    "description": "The $X$ gate switches $\\ket{0}$ and $\\ket{1}$ components, like the classical NOT operation. Can you make an $X$ gate using only $H$ and $T$? Drag and drop gates into the circuit to build your gate.\n\nRecall that $T$ applies a $\\pi/4$ phase to the $\\ket{1}$ component.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "T"
+    ],
+    "nQubits": 1,
+    "nSteps": 6,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "H",
+      "0_1": "T",
+      "0_2": "T",
+      "0_3": "T",
+      "0_4": "T",
+      "0_5": "H"
+    },
+    "answerNQubits": 1,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "$TTTT=Z$. In other words, phases add up.",
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0
   }
 ]
