@@ -48,6 +48,7 @@ export function parseBuilderBackup(questions) {
           wire.map(cell => (cell ? { ...cell, locked: true } : null))
         );
       }
+      if (q.hideResults) out.hideResults = true;
       if (q.explanation) out.explanation = q.explanation;
       return out;
     }
@@ -89,6 +90,7 @@ export function parseBuilderBackup(questions) {
     if (q.evaluationType) out.evaluationType = q.evaluationType;
     if (q.targetState) out.targetState = q.targetState;
     if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
+    if (q.hideResults) out.hideResults = true;
     if (q.explanation) out.explanation = q.explanation;
 
     // 3. Format the answer key
