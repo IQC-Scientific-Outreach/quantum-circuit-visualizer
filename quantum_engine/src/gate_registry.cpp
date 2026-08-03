@@ -5,6 +5,11 @@ using namespace std;
 namespace GateRegistry {
     const double inv_sqrt2 = M_SQRT1_2;
 
+    const Matrix2x2 I = {
+        Complex(1, 0), Complex(0, 0),
+        Complex(0, 0), Complex(1, 0)
+    };
+
     const Matrix2x2 H = {
         Complex(inv_sqrt2, 0), Complex(inv_sqrt2, 0),
         Complex(inv_sqrt2, 0), Complex(-inv_sqrt2, 0)
@@ -31,6 +36,7 @@ namespace GateRegistry {
     };
 
     const unordered_map<string, Matrix2x2> base_gates = {
+        {"I", I},
         {"H", H},
         {"X", X},
         {"Y", Y},
