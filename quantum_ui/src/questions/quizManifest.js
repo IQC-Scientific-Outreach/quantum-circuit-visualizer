@@ -8,9 +8,9 @@
 //   3. Add a row here (unique slug, title, description)
 //   4. Insert a quiz_availability row in Supabase (defaults locked)
 export const QUIZZES = [
-  { slug: 'quiz-1', title: 'Quiz 1', description: 'Week 1' },
-  { slug: 'quiz-2', title: 'Quiz 2', description: '' },
-  { slug: 'quiz-3', title: 'Quiz 3', description: '' },
+  { slug: 'quiz-1', title: 'Quiz 1', description: 'Single-qubit quantum circuits' },
+  { slug: 'quiz-2', title: 'Quiz 2', description: 'Two-qubit quantum circuits' },
+  { slug: 'quiz-3', title: 'Quiz 3', description: 'Quantum protocols as circuits' },
 ];
 
 export function getQuizMeta(slug) {
