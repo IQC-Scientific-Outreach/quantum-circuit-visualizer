@@ -56,8 +56,12 @@ function newQuestion(id = 1) {
     nQubits: 1, nSteps: 3,
     circuit: makeGrid(1, 3),
     exactAnswer: {},           // 'w_s' → gateName
-    answerNQubits: 1, answerNSteps: 1,
-    answerCircuit: makeGrid(1, 1),
+    // Equivalent-state mode: the student may add gates on either side of the given
+    // circuit. leftSteps / rightSteps size those two areas, and the two reference
+    // grids below are exactly as wide as the areas the student gets.
+    answerNQubits: 1, leftSteps: 0, rightSteps: 3,
+    preAnswerCircuit: makeGrid(1, 0),
+    answerCircuit: makeGrid(1, 3),
     hiddenBlocks: [],
     explanation: '',
     hideResults: false,        // when true, the results panel is hidden from students (any type)
@@ -157,6 +161,14 @@ function compactGridData(grid, exactAnswer = null, hiddenBlocks = null) {
   return { newGrid, newExactAnswer, newHiddenBlocks };
 }
 
+/** Pads a compacted grid back out to `width` columns, adding the empties on `side`. */
+function padGrid(grid, width, side) {
+  const extra = Math.max(0, width - (grid[0]?.length ?? 0));
+  if (extra === 0) return grid;
+  const fill = Array(extra).fill(null);
+  return grid.map(wire => side === 'left' ? [...fill, ...wire] : [...wire, ...fill]);
+}
+
 function serializeAnswerCircuit(circuit) {
   const answer = [];
   circuit.forEach((wire, wi) => {
@@ -230,7 +242,12 @@ function serializeQuestion(q, id) {
   if (q.targetState) out.targetState = q.targetState;
 
   if (!q.restrictToBlanks) {
-    out.answer = serializeAnswerCircuit(q.answerCircuit);
+    out.answer     = serializeAnswerCircuit(q.answerCircuit);
+    out.rightSteps = q.rightSteps ?? (q.answerCircuit[0]?.length ?? 0);
+    if (q.leftSteps > 0) {
+      out.leftSteps = q.leftSteps;
+      out.preAnswer = serializeAnswerCircuit(q.preAnswerCircuit);
+    }
   } else {
     out.answer = Object.entries(q.exactAnswer)
       .filter(([, gate]) => gate)
@@ -583,13 +600,27 @@ function QuestionEditor({ question: q, onChange }) {
     update({ circuit: newGrid, nSteps: newGrid[0].length, exactAnswer: newExactAnswer, hiddenBlocks: newHiddenBlocks });
   }
 
+  // The two reference grids keep the width of the student area they stand for, so
+  // they only grow when a drop inserts a column (compaction never shrinks them).
   function handleAnswerChange(updater) {
     const prevGrid = q.answerCircuit;
     const newCircuitRaw = typeof updater === 'function' ? updater(prevGrid) : updater;
     if (newCircuitRaw === prevGrid) return;
-    
+
     const { newGrid } = compactGridData(newCircuitRaw);
-    update({ answerCircuit: newGrid, answerNSteps: newGrid[0].length });
+    const width = Math.max(q.rightSteps, newGrid[0].length);
+    update({ answerCircuit: padGrid(newGrid, width, 'right'), rightSteps: width });
+  }
+
+  // Gates before the given circuit pack against it, mirroring the student's view.
+  function handlePreAnswerChange(updater) {
+    const prevGrid = q.preAnswerCircuit;
+    const newCircuitRaw = typeof updater === 'function' ? updater(prevGrid) : updater;
+    if (newCircuitRaw === prevGrid) return;
+
+    const { newGrid } = compactGridData(newCircuitRaw);
+    const width = Math.max(q.leftSteps, newGrid[0].length);
+    update({ preAnswerCircuit: padGrid(newGrid, width, 'left'), leftSteps: width });
   }
 
   // ── Wire / step resize ────────────────────────────────────────────────────
@@ -598,13 +629,18 @@ function QuestionEditor({ question: q, onChange }) {
     const nextNQubits = q.nQubits + 1;
     const nextAnswerCircuit = [...q.answerCircuit];
     while (nextAnswerCircuit.length < nextNQubits) {
-      nextAnswerCircuit.push(Array(q.answerNSteps).fill(null));
+      nextAnswerCircuit.push(Array(q.rightSteps).fill(null));
+    }
+    const nextPreAnswerCircuit = [...q.preAnswerCircuit];
+    while (nextPreAnswerCircuit.length < nextNQubits) {
+      nextPreAnswerCircuit.push(Array(q.leftSteps).fill(null));
     }
     update({
       nQubits: nextNQubits,
       circuit: [...q.circuit, Array(q.nSteps).fill(null)],
       answerNQubits: nextNQubits,
       answerCircuit: nextAnswerCircuit,
+      preAnswerCircuit: nextPreAnswerCircuit,
     });
   }
   function removeWire() {
@@ -612,12 +648,14 @@ function QuestionEditor({ question: q, onChange }) {
     const d = q.nQubits - 1; // index of last wire to remove
     const newCircuit = removeWireFromGrid(q.circuit, d);
     const newAnswerCircuit = removeWireFromGrid(q.answerCircuit, d);
+    const newPreAnswerCircuit = removeWireFromGrid(q.preAnswerCircuit, d);
     const newExact = Object.fromEntries(
       Object.entries(q.exactAnswer).filter(([k]) => Number(k.split('_')[0]) < d)
     );
     update({
       nQubits: d, circuit: newCircuit, exactAnswer: newExact,
       answerNQubits: d, answerCircuit: newAnswerCircuit,
+      preAnswerCircuit: newPreAnswerCircuit,
     });
   }
   function addStep()    { update({ nSteps: q.nSteps + 1, circuit: q.circuit.map(w => [...w, null]) }); }
@@ -629,10 +667,17 @@ function QuestionEditor({ question: q, onChange }) {
     );
     update({ nSteps: last, circuit: q.circuit.map(w => w.slice(0, last)), exactAnswer: newExact });
   }
-  function addAnswerStep()    { update({ answerNSteps: q.answerNSteps + 1, answerCircuit: q.answerCircuit.map(w => [...w, null]) }); }
-  function removeAnswerStep() {
-    if (q.answerNSteps <= 0) return;
-    update({ answerNSteps: q.answerNSteps - 1, answerCircuit: q.answerCircuit.map(w => w.slice(0, -1)) });
+  // Student area after the given circuit (also the width of the answer grid).
+  function addRightStep()    { update({ rightSteps: q.rightSteps + 1, answerCircuit: q.answerCircuit.map(w => [...w, null]) }); }
+  function removeRightStep() {
+    if (q.rightSteps <= 0) return;
+    update({ rightSteps: q.rightSteps - 1, answerCircuit: q.answerCircuit.map(w => w.slice(0, -1)) });
+  }
+  // Student area before the given circuit — grows and shrinks at its outer (left) edge.
+  function addLeftStep()    { update({ leftSteps: q.leftSteps + 1, preAnswerCircuit: q.preAnswerCircuit.map(w => [null, ...w]) }); }
+  function removeLeftStep() {
+    if (q.leftSteps <= 0) return;
+    update({ leftSteps: q.leftSteps - 1, preAnswerCircuit: q.preAnswerCircuit.map(w => w.slice(1)) });
   }
 
   // ── Blank positions (exact answer section) ────────────────────────────────
@@ -884,6 +929,8 @@ function QuestionEditor({ question: q, onChange }) {
           <div className="space-y-4">
             <p className="text-xs text-slate-400">
               Build the reference answer circuit using only the gates students are allowed. Any circuit producing the same state is accepted.
+              Students can work in the areas before and after the given circuit — set how many steps each one gets below, then place your
+              reference gates in them.
             </p>
             {answerPalette.length === 0 && (
               <p className="text-xs text-amber-400">No allowed gates selected above — enable some gates first.</p>
@@ -895,16 +942,35 @@ function QuestionEditor({ question: q, onChange }) {
               {answerPalette.map(g => <BuilderPaletteGate key={g} gateName={g} />)}
             </div>
 
-            {/* Answer Steps Control */}
+            {/* Student area size — one control per side of the given circuit */}
             <div className="flex gap-3 items-center flex-wrap text-xs text-slate-400">
-              <span>Answer Steps:</span>
-              <button onClick={removeAnswerStep} disabled={q.answerNSteps <= 0} className={btnCls}>−</button>
-              <span className="text-slate-200 w-4 text-center font-medium">{q.answerNSteps}</span>
-              <button onClick={addAnswerStep} disabled={q.answerNSteps >= 20} className={btnCls}>+</button>
+              <span>Steps before circuit:</span>
+              <button onClick={removeLeftStep} disabled={q.leftSteps <= 0} className={btnCls}>−</button>
+              <span className="text-slate-200 w-4 text-center font-medium">{q.leftSteps}</span>
+              <button onClick={addLeftStep} disabled={q.leftSteps >= 20} className={btnCls}>+</button>
+              <span className="ml-4">Steps after circuit:</span>
+              <button onClick={removeRightStep} disabled={q.rightSteps <= 0} className={btnCls}>−</button>
+              <span className="text-slate-200 w-4 text-center font-medium">{q.rightSteps}</span>
+              <button onClick={addRightStep} disabled={q.rightSteps >= 20} className={btnCls}>+</button>
             </div>
+            <p className="text-[10px] text-slate-500">
+              These are the steps the student may fill. The area before the circuit is fixed at this size; the area after it still grows as
+              the student runs out of room.
+            </p>
 
             {/* Combined Grid Visual */}
             <div className="flex items-start overflow-x-auto bg-slate-900/40 p-4 rounded-xl border border-slate-700/50">
+              {q.leftSteps > 0 && (
+                <div className="shrink-0 border-r-2 border-slate-600/50 pr-4 mr-2">
+                  <BuilderCircuitGrid
+                    gridId={`preanswer_${q.id}`}
+                    nQubits={q.answerNQubits} nSteps={q.leftSteps} circuit={q.preAnswerCircuit}
+                    onCellsChange={handlePreAnswerChange}
+                    showBlanks={false} paletteGates={answerPalette}
+                    hideControls={true}
+                  />
+                </div>
+              )}
               <div className="shrink-0 border-r-2 border-slate-600/50 pr-4 mr-2">
                 <BuilderCircuitGrid
                   gridId={`given_readonly_${q.id}`}
@@ -912,17 +978,19 @@ function QuestionEditor({ question: q, onChange }) {
                   onCellsChange={() => {}}
                   showBlanks={false} paletteGates={[]}
                   readOnly={true}
+                  hideWireLabels={q.leftSteps > 0}
+                  stepOffset={q.leftSteps}
                   hideControls={true}
                 />
               </div>
               <div className="shrink-0">
                 <BuilderCircuitGrid
                   gridId={`answer_${q.id}`}
-                  nQubits={q.answerNQubits} nSteps={q.answerNSteps} circuit={q.answerCircuit}
+                  nQubits={q.answerNQubits} nSteps={q.rightSteps} circuit={q.answerCircuit}
                   onCellsChange={handleAnswerChange}
                   showBlanks={false} paletteGates={answerPalette}
                   hideWireLabels={true}
-                  stepOffset={q.nSteps}
+                  stepOffset={q.leftSteps + q.nSteps}
                   hideControls={true}
                 />
               </div>
@@ -1045,9 +1113,20 @@ export default function QuestionBuilderPage() {
         let maxId = Math.max(0, ...data.map(q => q.id || 0));
         if (Array.isArray(data) && data.length > 0) {
           const syncedData = data.map(q => {
+            const nQubits = q.nQubits || 1;
+            // answerNSteps is the pre-"steps before/after" name for rightSteps; backups
+            // that predate it only sized the answer, so give students a little room.
+            const rightSteps = q.rightSteps ?? Math.max(q.answerNSteps ?? 1, 3);
+            const leftSteps  = q.leftSteps ?? 0;
+
             let ac = q.answerCircuit || [[null]];
-            while (ac.length < (q.nQubits ?? 1)) ac.push(Array(q.answerNSteps ?? 1).fill(null));
-            
+            while (ac.length < nQubits) ac.push(Array(rightSteps).fill(null));
+            ac = padGrid(ac, rightSteps, 'right');
+
+            let pac = q.preAnswerCircuit || makeGrid(nQubits, leftSteps);
+            while (pac.length < nQubits) pac.push(Array(leftSteps).fill(null));
+            pac = padGrid(pac, leftSteps, 'left');
+
             let exactAnswer = q.exactAnswer || {};
             if (q.restrictToBlanks && q.answer && Object.keys(exactAnswer).length === 0) {
               q.answer.forEach(ans => {
@@ -1057,8 +1136,11 @@ export default function QuestionBuilderPage() {
             return {
               ...q,
               id: q.id ?? (++maxId),
-              answerNQubits: q.nQubits || 1,
-              answerCircuit: ac.slice(0, q.nQubits || 1),
+              answerNQubits: nQubits,
+              answerCircuit: ac.slice(0, nQubits),
+              leftSteps, rightSteps,
+              answerNSteps: undefined,   // superseded by rightSteps
+              preAnswerCircuit: pac.slice(0, nQubits),
               exactAnswer,
               // MCQ defaults (older backups + interop safety)
               questionType: q.questionType || 'circuit',

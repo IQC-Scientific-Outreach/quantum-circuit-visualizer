@@ -58,11 +58,13 @@ function FilledBlankGate({ gateName, onClear }) {
 // ─── Circuit board ────────────────────────────────────────────────────────────
 
 /**
- * separatorStep: if provided, draws a thin divider line before that column
- * to mark the boundary between the "given" question circuit and the
- * student-editable area (used for restrictToBlanks: false questions).
+ * separatorSteps: column indices to draw a thin divider line before, marking the
+ * boundaries between the "given" question circuit and the student-editable areas
+ * on either side of it (used for restrictToBlanks: false questions).
+ * stepOffset: how many editable columns precede the given circuit — hiddenBlocks
+ * step indices are relative to the given circuit, so the overlay shifts by it.
  */
-function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelete, separatorStep, selectedQubit, onWireClick, hoveredBarrier, onHoverBarrier, onResizeBarrier }) {
+function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelete, separatorSteps = [], stepOffset = 0, selectedQubit, onWireClick, hoveredBarrier, onHoverBarrier, onResizeBarrier }) {
   const customRenderer = useCallback((cell, wireIndex, stepIndex) => {
     if (!cell) {
       if (restrictToBlanks) return null;
@@ -128,12 +130,12 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelet
             {wire.flatMap((cell, stepIndex) => {
               const elements = [];
               // Divider between given circuit and student-editable area
-              if (separatorStep != null && stepIndex === separatorStep) {
+              if (separatorSteps.includes(stepIndex)) {
                 elements.push(
                   <div
-                    key={`sep-${wireIndex}`}
+                    key={`sep-${wireIndex}-${stepIndex}`}
                     className="w-0.5 h-10 bg-blue-500/40 mx-1.5 shrink-0 self-center rounded-full"
-                    title="Student circuit starts here"
+                    title="Boundary of the given circuit"
                   />
                 );
               }
@@ -168,7 +170,7 @@ function QuestionCircuit({ circuitState, hiddenBlocks, restrictToBlanks, onDelet
           className="absolute z-40 bg-slate-800/95 border border-slate-600 rounded-lg flex items-center justify-center backdrop-blur-sm shadow-xl"
           style={{
             top:    `calc(1.25rem + ${block.topWire}   * 5rem)`,
-            left:   `calc(5.75rem + ${block.startStep} * 4rem)`,
+            left:   `calc(5.75rem + ${block.startStep + stepOffset} * 4rem)`,
             width:  `calc(${(block.endStep - block.startStep + 1)} * 4rem - 0.5rem)`,
             height: `calc(${(block.bottomWire - block.topWire  + 1)} * 5rem - 0.5rem)`,
           }}
@@ -238,33 +240,124 @@ function FinalScreen({ scores, questions, onRetry, courseMode }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// ─── Editable-region geometry (equivalent-state questions) ───────────────────
+// A free-form question's grid is laid out as
+//   [ leftSteps editable columns | given circuit | rightSteps editable columns ]
+// leftSteps is fixed; the right region still grows as the student fills it.
+// Both default to the historic layout: nothing before, a buffer after.
+
+/** Columns the given circuit occupies inside the student grid. */
+function givenLen(question) {
+  const c = question.circuit;
+  if (!c || c.length === 0) return 0;
+  return Math.max(0, ...c.map(w => w.length));
+}
+
+/** Editable columns before the given circuit. */
+function leftStepsOf(question) {
+  if (question.restrictToBlanks || question.questionType === 'mcq') return 0;
+  return Math.max(0, question.leftSteps ?? 0);
+}
+
+/** Editable columns after the given circuit (the legacy buffer when unspecified). */
+function rightStepsOf(question) {
+  if (question.restrictToBlanks || question.questionType === 'mcq') return 0;
+  return Math.max(0, question.rightSteps ?? Math.max(3, 8 - givenLen(question)));
+}
+
+/**
+ * Start column of the given circuit. A drop may splice a column into the grid,
+ * so the block is located by its locked cells rather than assumed to sit at
+ * leftSteps; `fallback` covers questions that ship no given circuit at all.
+ */
+function findGivenStart(grid, qLen, fallback) {
+  if (qLen === 0) return fallback;
+  for (let s = 0; s < (grid[0]?.length ?? 0); s++) {
+    for (let w = 0; w < grid.length; w++) {
+      const cell = grid[w][s];
+      if (cell && (cell.locked || cell.blank)) return s;
+    }
+  }
+  return fallback;
+}
+
+/** Packs the left region against the given circuit, keeping exactly `width`
+ *  columns. Returns null when its gates no longer fit (drop is then rejected). */
+function fitLeftRegion(part, width) {
+  const current = part[0]?.length ?? 0;
+  if (current === 0) return part.map(() => Array(width).fill(null));
+  // compactCircuit packs left, so reverse around it to pack right instead.
+  const packed = compactCircuit(part.map(w => [...w].reverse())).map(w => w.reverse());
+  if (current > width) {
+    const surplus = packed.map(w => w.slice(0, current - width));
+    if (surplus.some(w => w.some(c => c !== null))) return null;
+    return packed.map(w => w.slice(current - width));
+  }
+  return packed.map(w => [...Array(width - current).fill(null), ...w]);
+}
+
+/**
+ * Restores the [left | given | right] layout after a drop or a delete: student
+ * gates are packed against the given circuit from both sides and the left
+ * region is pinned to its fixed width. The right region keeps whatever width it
+ * ended up with — the auto-resize pass below settles it.
+ * Returns null when the left region can no longer hold its gates.
+ */
+function normalizeRegions(grid, question) {
+  const qLen  = givenLen(question);
+  const left  = leftStepsOf(question);
+  const start = findGivenStart(grid, qLen, left);
+
+  const leftPart  = grid.map(w => w.slice(0, start));
+  const given     = grid.map(w => w.slice(start, start + qLen));
+  const rightPart = grid.map(w => w.slice(start + qLen));
+
+  const packedLeft = fitLeftRegion(leftPart, left);
+  if (!packedLeft) return null;
+  const packedRight = (rightPart[0]?.length ?? 0) > 0 ? compactCircuit(rightPart) : rightPart;
+
+  return grid.map((_, i) => [...packedLeft[i], ...given[i], ...packedRight[i]]);
+}
+
+/** hiddenBlocks step indices are relative to the given circuit — shift them into grid space. */
+function shiftHiddenBlocks(question) {
+  const left = leftStepsOf(question);
+  if (!question.hiddenBlocks || left === 0) return question.hiddenBlocks;
+  return question.hiddenBlocks.map(b => ({ ...b, startStep: b.startStep + left, endStep: b.endStep + left }));
+}
+
 function initCircuit(question) {
   const src = (question.circuit && question.circuit.length > 0) ? question.circuit : [[null]];
-  const minLength     = Math.max(1, ...src.map(w => w.length));
-  // MCQ (and restrict-to-blanks) questions show the given circuit as-is — no editable buffer.
-  const desiredLength = (question.restrictToBlanks || question.questionType === 'mcq') ? minLength : Math.max(8, minLength + 3);
-  return src.map(wire =>
-    [...wire.map(cell => (cell ? { ...cell } : null)), ...Array(Math.max(0, desiredLength - minLength)).fill(null)]
-  );
+  const qLen  = givenLen(question);
+  const left  = leftStepsOf(question);
+  const right = rightStepsOf(question);
+  // MCQ (and restrict-to-blanks) questions show the given circuit as-is — no editable area.
+  if (left + qLen + right === 0) return src.map(() => [null]);
+  return src.map(wire => [
+    ...Array(left).fill(null),
+    ...Array.from({ length: qLen }, (_, s) => (wire[s] ? { ...wire[s] } : null)),
+    ...Array(right).fill(null),
+  ]);
 }
 
 function getAnswerCircuit(question) {
   if (question.questionType === 'mcq') return initCircuit(question);
   const base = initCircuit(question);
   if (!question.restrictToBlanks) {
+    const left = leftStepsOf(question);
     let next = base.map(w => w.map(c => (c && !c.locked) ? null : c));
-    if (question.answer) {
-      const qLen = question.circuit[0].length;
-      question.answer.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
-        const absStep = stepIndex + qLen;
-        while (next[0].length <= absStep) next.forEach(w => w.push(null));
-        if (role) {
-          next[wireIndex][absStep] = { name: gate, role, targetWire, controlWire, controls };
-        } else {
-          next[wireIndex][absStep] = { name: gate };
-        }
-      });
-    }
+    const place = (entries, offset) => entries.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
+      const absStep = stepIndex + offset;
+      while (next[0].length <= absStep) next.forEach(w => w.push(null));
+      if (role) {
+        next[wireIndex][absStep] = { name: gate, role, targetWire, controlWire, controls };
+      } else {
+        next[wireIndex][absStep] = { name: gate };
+      }
+    });
+    // Reference gates before the given circuit, then the ones after it.
+    place((question.preAnswer || []).filter(a => a.stepIndex < left), 0);
+    place(question.answer || [], left + givenLen(question));
     return next;
   }
 
@@ -440,22 +533,26 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
     setPrevQuestionIndex(questionIndex);
 
     if (!isMCQ && questionIndex >= scores.length) { // equivalent to skipping auto-expanding on past questions
-      let highestOccupiedIndex = -1;
+      const qLen  = givenLen(question);
+      const left  = leftStepsOf(question);
+      const right = rightStepsOf(question);
+
+      // Columns used inside the right region — keep 3 spare ones beyond them.
+      let usedRight = 0;
       for (const wire of circuitState) {
-        for (let i = wire.length - 1; i >= 0; i--) {
+        for (let i = wire.length - 1; i >= left + qLen; i--) {
           if (wire[i] !== null) {
-            if (i > highestOccupiedIndex) highestOccupiedIndex = i;
+            usedRight = Math.max(usedRight, i - (left + qLen) + 1);
             break;
           }
         }
       }
-      
-      const minLength = Math.max(...question.circuit.map(w => w.length));
+
       const desiredLength = question.restrictToBlanks
-        ? minLength
-        : Math.max(minLength + 3, highestOccupiedIndex + 4);
+        ? qLen
+        : left + qLen + (right === 0 ? 0 : Math.max(right, usedRight + 3));
       const currentLength = circuitState[0].length;
-  
+
       if (currentLength < desiredLength) {
         setCircuitState(prev => prev.map(wire => [...wire, ...Array(desiredLength - currentLength).fill(null)]));
       } else if (currentLength > desiredLength) {
@@ -474,7 +571,10 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
 
         const { wireIndex, stepIndex } = dest.data;
 
-        if (!question.restrictToBlanks && stepIndex < question.circuit[0].length) {
+        const givenStart = leftStepsOf(question);
+        const givenEnd   = givenStart + givenLen(question);
+        // The given circuit itself stays untouchable; both sides of it are fair game.
+        if (!question.restrictToBlanks && stepIndex >= givenStart && stepIndex < givenEnd) {
           return;
         }
 
@@ -584,16 +684,13 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
             }
           }
           const next = applyGateDrop(prev, source.data, dest.data, {
-            hiddenBlocks: question.hiddenBlocks,
+            // Drops before the given circuit can't shift it — normalizeRegions puts it back.
+            hiddenBlocks: stepIndex < givenStart ? [] : shiftHiddenBlocks(question),
           });
-          // For free-form (equivalent circuit) mode, left-align after every drop
+          // For free-form (equivalent circuit) mode, re-pack around the given circuit
           if (question.restrictToBlanks) return next;
-          
-          const sep = question.circuit[0].length;
-          const left = next.map(w => w.slice(0, sep));
-          const right = next.map(w => w.slice(sep));
-          const compactedRight = compactCircuit(right);
-          return left.map((w, i) => [...w, ...compactedRight[i]]);
+
+          return normalizeRegions(next, question) ?? prev;
         });
         setFeedback(null);
       },
@@ -621,14 +718,10 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
       }
       // removeGateFromCircuit guards cell.locked — locked question gates are never removed
       const next = removeGateFromCircuit(prev, wireIndex, stepIndex);
-      // Left-align after delete in free-form mode
+      // Re-pack around the given circuit after delete in free-form mode
       if (question.restrictToBlanks) return next;
 
-      const sep = question.circuit[0].length;
-      const left = next.map(w => w.slice(0, sep));
-      const right = next.map(w => w.slice(sep));
-      const compactedRight = compactCircuit(right);
-      return left.map((w, i) => [...w, ...compactedRight[i]]);
+      return normalizeRegions(next, question) ?? next;
     });
     setFeedback(null);
   }, [question, questionIndex, scores.length]);
@@ -658,11 +751,7 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
         newCircuit[w][stepIndex] = { name: 'BARRIER', topWire: newTop, bottomWire: newBottom };
       }
 
-      const sep = question.circuit[0].length;
-      const left = newCircuit.map(w => w.slice(0, sep));
-      const right = newCircuit.map(w => w.slice(sep));
-      const compactedRight = compactCircuit(right);
-      return left.map((w, i) => [...w, ...compactedRight[i]]);
+      return normalizeRegions(newCircuit, question) ?? prev;
     });
   }, [question, questionIndex, scores.length]);
 
@@ -671,25 +760,29 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
     if (!question.restrictToBlanks) {
       if (!simResults || simResults.stateVector.length === 0 || !engine) return false;
 
-      const expectedGrid = question.circuit.map(wire => wire.map(cell => {
-        if (!cell || cell.blank) return null;
-        return { ...cell };
-      }));
+      const qLen = givenLen(question);
+      const left = leftStepsOf(question);
+      const expectedGrid = question.circuit.map(wire => [
+        ...Array(left).fill(null),
+        ...Array.from({ length: qLen }, (_, s) => {
+          const cell = wire[s];
+          return (!cell || cell.blank) ? null : { ...cell };
+        }),
+      ]);
 
-      if (question.answer) {
-        // Answer step indices from the builder are 0-based (relative to answerCircuit).
-        // Offset them past the question circuit so they don't overwrite locked gates.
-        const qLen = question.circuit[0].length;
-        question.answer.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
-          const absStep = stepIndex + qLen;
-          while (expectedGrid[0].length <= absStep) expectedGrid.forEach(w => w.push(null));
-          if (role) {
-            expectedGrid[wireIndex][absStep] = { name: gate, role, targetWire, controlWire, controls };
-          } else {
-            expectedGrid[wireIndex][absStep] = { name: gate };
-          }
-        });
-      }
+      // Answer step indices from the builder are 0-based within their own region.
+      // Offset them so they land beside — never on top of — the locked gates.
+      const place = (entries, offset) => entries.forEach(({ wireIndex, stepIndex, gate, role, targetWire, controlWire, controls }) => {
+        const absStep = stepIndex + offset;
+        while (expectedGrid[0].length <= absStep) expectedGrid.forEach(w => w.push(null));
+        if (role) {
+          expectedGrid[wireIndex][absStep] = { name: gate, role, targetWire, controlWire, controls };
+        } else {
+          expectedGrid[wireIndex][absStep] = { name: gate };
+        }
+      });
+      place((question.preAnswer || []).filter(a => a.stepIndex < left), 0);
+      place(question.answer || [], left + qLen);
 
       const expectedSim = simulateCircuit(engine, expectedGrid, null, shots, null);
       if (!expectedSim || expectedSim.stateVector.length === 0) return false;
@@ -832,8 +925,13 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
   const maxPoints    = activeQuestions.reduce((s, q) => s + q.points, 0);
   const currentScore = scores.reduce((s, r) => s + r.points, 0);
 
-  // For equivalent-circuit questions: show a separator after the given circuit
-  const separatorStep = (!isMCQ && !question.restrictToBlanks) ? question.circuit[0].length : undefined;
+  // For equivalent-circuit questions: separators around the given circuit
+  const freeForm    = !isMCQ && !question.restrictToBlanks;
+  const leftSteps   = freeForm ? leftStepsOf(question) : 0;
+  const givenSteps  = freeForm ? givenLen(question)    : 0;
+  const separatorSteps = freeForm
+    ? [...(leftSteps > 0 ? [leftSteps] : []), ...(givenSteps > 0 ? [leftSteps + givenSteps] : [])]
+    : [];
 
   return (
     <div className="fixed inset-0 w-full flex flex-col font-sans text-slate-300 bg-slate-950">
@@ -957,9 +1055,11 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
               </ReactMarkdown>
             </div>
             {/* Label for equivalent-circuit questions */}
-            {!question.restrictToBlanks && separatorStep != null && (
+            {freeForm && separatorSteps.length > 0 && (
               <p className="text-[10px] text-slate-600 mt-1">
-                The blue line separates the given circuit (left) from your additions (right). Both count for amplitude.
+                {leftSteps > 0
+                  ? 'The blue lines mark off the given circuit — you can add gates before it and after it. Everything counts for amplitude.'
+                  : 'The blue line separates the given circuit (left) from your additions (right). Both count for amplitude.'}
               </p>
             )}
           </div>
@@ -994,7 +1094,8 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
                 hiddenBlocks={hiddenCircuitRevealed ? [] : question.hiddenBlocks}
                 restrictToBlanks={question.restrictToBlanks}
                 onDelete={deleteGate}
-                separatorStep={separatorStep}
+                separatorSteps={separatorSteps}
+                stepOffset={leftSteps}
                 selectedQubit={selectedQubit}
                 onWireClick={wi => setSelectedQubit(prev => prev === wi ? null : wi)}
                 hoveredBarrier={hoveredBarrier}
