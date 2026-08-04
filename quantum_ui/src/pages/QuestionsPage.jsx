@@ -249,7 +249,7 @@ function FinalScreen({ scores, questions, onRetry, courseMode }) {
 // Both default to the historic layout: nothing before, a buffer after.
 
 // Empty columns kept beyond the student's outermost gate on a growing side.
-const SPARE_STEPS = 3;
+const SPARE_STEPS = 1;
 
 /** Columns the given circuit occupies inside the student grid. */
 function givenLen(question) {
