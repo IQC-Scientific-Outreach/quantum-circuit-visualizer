@@ -954,8 +954,8 @@ function QuestionEditor({ question: q, onChange }) {
               <button onClick={addRightStep} disabled={q.rightSteps >= 20} className={btnCls}>+</button>
             </div>
             <p className="text-[10px] text-slate-500">
-              These are the steps the student may fill. The area before the circuit is fixed at this size; the area after it still grows as
-              the student runs out of room.
+              These are the steps the student starts with on each side. Both areas grow outwards as the student runs out of room — the given
+              circuit itself stays where it is.
             </p>
 
             {/* Combined Grid Visual */}
