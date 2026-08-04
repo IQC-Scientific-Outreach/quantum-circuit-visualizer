@@ -18,11 +18,13 @@
  *   If false (or omitted), simulates the 'answer' circuit and checks if the student's circuit produces an identical state vector (ignoring global phase).
  *
  * leftSteps / rightSteps: number (optional, equivalent-state questions)
- *   Editable columns the student gets before / after the given circuit:
+ *   Editable columns the student starts with before / after the given circuit:
  *     [ leftSteps | given circuit | rightSteps ]
- *   leftSteps defaults to 0 (nothing before the circuit); rightSteps defaults to
- *   the historic trailing buffer. 'answer' step indices are relative to the area
- *   after the circuit, 'preAnswer' ones to the area before it.
+ *   Either area grows outwards as the student fills it, keeping the circuit block
+ *   in place. leftSteps defaults to 0 (nothing before the circuit, so nothing to
+ *   grow); rightSteps defaults to the historic trailing buffer. 'answer' step
+ *   indices are relative to the area after the circuit, 'preAnswer' ones to the
+ *   area before it.
  *
  * preAnswer: [{ wireIndex, stepIndex, gate, ... }] (optional)
  *   Reference gates placed before the given circuit, same shape as 'answer'.
