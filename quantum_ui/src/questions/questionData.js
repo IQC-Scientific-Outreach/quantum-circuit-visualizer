@@ -16,13 +16,47 @@
  * restrictToBlanks: boolean (optional)
  *   If true, prevents drag-and-drop into empty grid slots, restricting placement only to 'blank' slots, and checks exact gate placement matches the 'answer' array.
  *   If false (or omitted), simulates the 'answer' circuit and checks if the student's circuit produces an identical state vector (ignoring global phase).
- * 
+ *
+ * leftSteps / rightSteps: number (optional, equivalent-state questions)
+ *   Editable columns the student gets before / after the given circuit:
+ *     [ leftSteps | given circuit | rightSteps ]
+ *   leftSteps defaults to 0 (nothing before the circuit); rightSteps defaults to
+ *   the historic trailing buffer. 'answer' step indices are relative to the area
+ *   after the circuit, 'preAnswer' ones to the area before it.
+ *
+ * preAnswer: [{ wireIndex, stepIndex, gate, ... }] (optional)
+ *   Reference gates placed before the given circuit, same shape as 'answer'.
+ *
  * hiddenBlocks: [{ topWire, bottomWire, startStep, endStep }]
  *   Renders a large opaque block over parts of the circuit.
  * 
  * Add more questions to the array to scale the quiz — no other changes required.
  */
 import rawBackup from './questions.json';
+
+/** Flattens a builder reference grid into answer entries (step indices are grid-relative). */
+function answerFromGrid(circuit) {
+  const answer = [];
+  (circuit || []).forEach((wire, wi) => {
+    wire.forEach((cell, si) => {
+      if (!cell || cell.blank) return;
+      const item = { wireIndex: wi, stepIndex: si, gate: cell.name };
+      if (cell.role) {
+        item.role = cell.role;
+        if (cell.role === 'control') {
+          item.targetWire = cell.targetWire;
+          if (cell.controls) item.controls = cell.controls;
+        } else {
+          if (cell.controlWire != null) item.controlWire = cell.controlWire;
+          if (cell.controls)            item.controls     = cell.controls;
+          if (cell.targetWire != null)  item.targetWire   = cell.targetWire;
+        }
+      }
+      answer.push(item);
+    });
+  });
+  return answer;
+}
 
 export function parseBuilderBackup(questions) {
   if (!Array.isArray(questions)) return [];
@@ -96,26 +130,14 @@ export function parseBuilderBackup(questions) {
 
     // 3. Format the answer key
     if (!q.restrictToBlanks) {
-      const answer = [];
-      (q.answerCircuit || []).forEach((wire, wi) => {
-        wire.forEach((cell, si) => {
-          if (!cell || cell.blank) return;
-          const item = { wireIndex: wi, stepIndex: si, gate: cell.name };
-          if (cell.role) {
-            item.role = cell.role;
-            if (cell.role === 'control') {
-              item.targetWire = cell.targetWire;
-              if (cell.controls) item.controls = cell.controls;
-            } else {
-              if (cell.controlWire != null) item.controlWire = cell.controlWire;
-              if (cell.controls)            item.controls     = cell.controls;
-              if (cell.targetWire != null)  item.targetWire   = cell.targetWire;
-            }
-          }
-          answer.push(item);
-        });
-      });
-      out.answer = answer;
+      out.answer = answerFromGrid(q.answerCircuit);
+      // Student-editable steps around the given circuit. Backups written before
+      // these existed leave them unset, keeping the historic layout.
+      if (q.rightSteps != null) out.rightSteps = q.rightSteps;
+      if (q.leftSteps > 0) {
+        out.leftSteps = q.leftSteps;
+        out.preAnswer = answerFromGrid(q.preAnswerCircuit);
+      }
     } else {
       out.answer = Object.entries(q.exactAnswer || {})
         .filter(([, gate]) => gate)
