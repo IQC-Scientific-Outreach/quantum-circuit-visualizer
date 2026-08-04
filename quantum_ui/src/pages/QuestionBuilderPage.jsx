@@ -60,6 +60,7 @@ function newQuestion(id = 1) {
     answerCircuit: makeGrid(1, 1),
     hiddenBlocks: [],
     explanation: '',
+    hideResults: false,        // when true, the results panel is hidden from students (any type)
     // ── MCQ-only fields (ignored unless questionType === 'mcq') ──
     hideCircuit: false,        // when true, the given circuit is not shown to students
     choices: ['', ''],         // choice text (length = number of choices)
@@ -202,6 +203,7 @@ function serializeQuestion(q, id) {
       out.circuit = q.circuit.map(wire => wire.slice(0, Math.max(0, last + 1)).map(serializeCell));
       if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
     }
+    if (q.hideResults) out.hideResults = true;
     if (q.explanation) out.explanation = q.explanation;
     return out;
   }
@@ -236,6 +238,7 @@ function serializeQuestion(q, id) {
       .sort((a, b) => a.wireIndex - b.wireIndex || a.stepIndex - b.stepIndex);
   }
   if (q.hiddenBlocks?.length > 0) out.hiddenBlocks = q.hiddenBlocks;
+  if (q.hideResults) out.hideResults = true;
   if (q.explanation) out.explanation = q.explanation;
   return out;
 }
@@ -725,6 +728,13 @@ function QuestionEditor({ question: q, onChange }) {
               ))}
             </div>
           </div>
+          <div className="pb-0.5 flex flex-col gap-1">
+            <Toggle value={q.hideResults} onChange={v => update({ hideResults: v })}
+              label="Hide results panel" />
+            <span className="text-[10px] text-slate-500 pl-11">
+              {q.hideResults ? "Students won't see the probabilities / state output" : 'Results panel shown to students'}
+            </span>
+          </div>
           {!isMCQ && (
             <div className="pb-0.5 flex flex-col gap-1">
               <Toggle value={q.restrictToBlanks} onChange={v => update({ restrictToBlanks: v })}
@@ -1053,6 +1063,7 @@ export default function QuestionBuilderPage() {
               // MCQ defaults (older backups + interop safety)
               questionType: q.questionType || 'circuit',
               hiddenBlocks: q.hiddenBlocks ?? [],
+              hideResults: q.hideResults ?? false,
               hideCircuit: q.hideCircuit ?? false,
               choices: q.choices ?? ['', ''],
               correctChoice: q.correctChoice ?? 0,

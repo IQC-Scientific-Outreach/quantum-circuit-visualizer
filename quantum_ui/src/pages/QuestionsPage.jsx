@@ -1113,8 +1113,9 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
           </div>
         </div>
 
-        {/* Right: Results Panel (circuit questions only) */}
-        {!isMCQ && (
+        {/* Right: Results Panel (circuit questions only).
+            Per-question `hideResults` (default show) suppresses it. */}
+        {!question.hideResults && !isMCQ && (
           <ResultsPanel
             isReady={isReady}
             circuit={circuitState}
