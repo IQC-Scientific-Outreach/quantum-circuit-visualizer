@@ -935,7 +935,7 @@ export default function QuestionsPage({ initialQuestions, quizMeta, onEvent, onC
                 <div className="overflow-auto">
                   <QuestionCircuit
                     circuitState={circuitState}
-                    hiddenBlocks={null}
+                    hiddenBlocks={hiddenCircuitRevealed ? [] : question.hiddenBlocks}
                     restrictToBlanks={true}
                     onDelete={() => {}}
                     selectedQubit={null}
