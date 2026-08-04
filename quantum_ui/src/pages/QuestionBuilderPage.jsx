@@ -28,8 +28,8 @@ import 'katex/dist/katex.min.css';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SINGLE_GATES   = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
-const ALL_PALETTE_GATES = ['H', 'X', 'Y', 'Z', 'T', 'MEASURE', 'CNOT', 'CZ', 'FF_X', 'FF_Z', 'TOFFOLI', 'BARRIER'];
+const SINGLE_GATES   = ['I', 'H', 'X', 'Y', 'Z', 'T', 'MEASURE'];
+const ALL_PALETTE_GATES = ['I', 'H', 'X', 'Y', 'Z', 'T', 'MEASURE', 'CNOT', 'CZ', 'FF_X', 'FF_Z', 'TOFFOLI', 'BARRIER'];
 
 // ─── MCQ configuration ──────────────────────────────────────────────────────
 // Allowed range for the number of answer choices in a multiple-choice question.
