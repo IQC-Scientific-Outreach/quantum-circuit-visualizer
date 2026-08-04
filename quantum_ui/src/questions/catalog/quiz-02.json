@@ -1,52 +1,71 @@
 [
   {
-    "id": 5,
-    "title": "X gate",
-    "description": "The $X$ gate you just saw transforms $$\\ket 0$$ into $$\\ket 1$$, and $$\\ket 1$$ into $$\\ket 0$$. It is thus the quantum equivalent of the NOT gate for classical computers.\n \nIt is represented as $$X = \\begin{bmatrix} 0 & 1 \\\\ 1 & 0 \\end{bmatrix} = \\ket0\\bra1 + \\ket1\\bra0$$\n\n\nIn this circuit, the state after the hidden elements is $\\ket{01}$ as seen in the results panel. Drag and drop the correct gates to transform the circuit to $\\ket{10}$",
+    "id": 1,
+    "title": "",
+    "description": "",
     "points": 10,
+    "questionType": "circuit",
     "restrictToBlanks": false,
     "allowedGates": [
-      "X"
+      "H",
+      "X",
+      "Y",
+      "Z"
     ],
     "nQubits": 2,
     "nSteps": 1,
     "circuit": [
       [
         {
-          "name": "BARRIER",
-          "topWire": 0,
-          "bottomWire": 0
+          "name": "CZ",
+          "role": "control",
+          "targetWire": 1
         }
       ],
       [
         {
-          "name": "X"
+          "name": "CZ",
+          "role": "target",
+          "controlWire": 0
         }
       ]
     ],
     "exactAnswer": {},
     "answerNQubits": 2,
-    "answerNSteps": 1,
-    "answerCircuit": [
+    "leftSteps": 1,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
       [
-        {
-          "name": "X"
-        }
+        null
       ],
       [
         {
-          "name": "X"
+          "name": "H"
         }
       ]
     ],
-    "hiddenBlocks": [
-      {
-        "topWire": 0,
-        "bottomWire": 1,
-        "startStep": 0,
-        "endStep": 0
-      }
+    "answerCircuit": [
+      [
+        null,
+        null,
+        null
+      ],
+      [
+        {
+          "name": "H"
+        },
+        null,
+        null
+      ]
     ],
-    "explanation": "Note that the $X$ gate are *involutory*, which means that applying them twice effectively does nothing! You'll notice this later in many of our other gates as well."
+    "hiddenBlocks": [],
+    "explanation": "",
+    "hideResults": false,
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0
   }
 ]
