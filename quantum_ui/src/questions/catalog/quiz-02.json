@@ -1,11 +1,64 @@
 [
   {
     "id": 1,
-    "title": "",
-    "description": "",
+    "title": "Two-Qubit Systems",
+    "description": "This circuit has two qubits, whose joint quantum state we represent as $\\ket{a}\\otimes\\ket{b}$, with $\\ket{a}$ corresponding to the first (top) qubit and $\\ket{b}$ corresponding to the bottom qubit. Both start in the \"0\" state, so the initial state is $\\ket{0}\\otimes\\ket{0}$, often written as $\\ket{00}$.\n\nDrag and drop gates to change the state to $\\ket{0}\\otimes\\ket{1}$. You may use the identity gate to leave a qubit alone if needed.",
     "points": 10,
     "questionType": "circuit",
-    "restrictToBlanks": false,
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Z",
+      "I"
+    ],
+    "nQubits": 2,
+    "nSteps": 1,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ],
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "I",
+      "1_0": "X"
+    },
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "The desired state has the first qubit in the \"0\" state and the second in the \"1\" state, so a NOT ($X$) gate was needed on the second qubit only.",
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0,
+    "hideResults": false
+  },
+  {
+    "id": 2,
+    "title": "Two-Qubit Systems",
+    "description": "What is the output state of the circuit below?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
     "allowedGates": [
       "H",
       "X",
@@ -17,14 +70,635 @@
     "circuit": [
       [
         {
-          "name": "CZ",
+          "name": "X"
+        }
+      ],
+      [
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "The $X$ gate flips the first qubit to \"1\", and the $H$ flips the second to the $\\ket{+}$ superposition state.",
+    "hideCircuit": false,
+    "choices": [
+      "$\\ket{00}$",
+      "$\\ket{10}$",
+      "$\\ket{0+}$",
+      "$\\ket{1+}$",
+      "$\\ket{0-}$"
+    ],
+    "correctChoice": 3,
+    "hideResults": false
+  },
+  {
+    "id": 3,
+    "title": "Two-Qubit Systems",
+    "description": "Drag and drop gates to end up with the output state $\\ket{-}\\otimes\\ket{1}$.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "I",
+      "T"
+    ],
+    "nQubits": 2,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "name": "X"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ],
+      [
+        {
+          "name": "H"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 2,
+    "answerCircuit": [
+      [
+        {
+          "name": "H"
+        },
+        null
+      ],
+      [
+        {
+          "name": "Z"
+        },
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "This two-qubit circuit is separable, meaning operations on one don't affect the other and we can treat each qubit indepedently.",
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0,
+    "hideResults": false
+  },
+  {
+    "id": 4,
+    "title": "Two-Qubit Gates",
+    "description": "The controlled-NOT (aka cNOT or cX) gate enables qubits to interact with each other. If the control qubit, represented as a little filled-in circle, is in the \"1\" state, it will activate an $X$ gate for the second qubit, otherwise it will leave it alone.\n\nAdjust the circuit so the output state is $\\ket{11}$.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "X",
+      "Z",
+      "H"
+    ],
+    "nQubits": 2,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "name": "CNOT",
           "role": "control",
           "targetWire": 1
         }
       ],
       [
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "X"
+    },
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "Flipping the control to $\\ket{1}$ will activate the gate to flip the second qubit.",
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0,
+    "hideResults": false
+  },
+  {
+    "id": 5,
+    "title": "Two-Qubit Gates",
+    "description": "The first qubit need not be the control! Add a CNOT to the circuit below such that the output is $\\ket{11}$.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "CNOT"
+    ],
+    "nQubits": 2,
+    "nSteps": 2,
+    "circuit": [
+      [
+        null,
+        {
+          "name": "BLANK_2",
+          "role": "target",
+          "blank": true,
+          "controlWire": 1
+        }
+      ],
+      [
+        {
+          "name": "X"
+        },
+        {
+          "name": "BLANK_2",
+          "role": "control",
+          "blank": true,
+          "targetWire": 0
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "1_1": "CNOT"
+    },
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "The filled-in circle represents the control, and the gate is over the target.",
+    "hideResults": false,
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0
+  },
+  {
+    "id": 6,
+    "title": "Two-Qubit Gates",
+    "description": "The CNOT is not the only two-qubit gate. The controlled-$Z$ (also known as $cZ$ or cPHASE) works in the same way, but the control adjusts whether the target receives a $\\pi$-phase shift or not.\n\nAdjust the below circuit such that the output state is $\\ket{11}$.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "X",
+      "Z",
+      "I",
+      "T",
+      "CZ"
+    ],
+    "nQubits": 2,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
         {
           "name": "CZ",
+          "role": "control",
+          "targetWire": 1
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ],
+      [
+        {
+          "blank": true,
+          "name": "BLANK"
+        },
+        {
+          "name": "CZ",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "blank": true,
+          "name": "BLANK"
+        }
+      ]
+    ],
+    "exactAnswer": {
+      "0_0": "X",
+      "0_2": "I"
+    },
+    "answerNQubits": 2,
+    "answerNSteps": 3,
+    "answerCircuit": [
+      [
+        {
+          "name": "X"
+        },
+        {
+          "name": "CZ",
+          "role": "control",
+          "targetWire": 1
+        },
+        {
+          "name": "I"
+        }
+      ],
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CZ",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "name": "H"
+        }
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "Note that the $cZ$ is symmetric; the effect is the same regardless of which qubit is assigned as the target or the control. Flipping your circuit upside-down would have the same outcome.",
+    "hideResults": false,
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0
+  },
+  {
+    "id": 8,
+    "title": "Correlation",
+    "description": "Two qubits each start in the state $\\ket{0}$. An $H$ is applied to the first qubit, and then a cNOT is applied with the first qubit as the control and the second as the target. We measure the first qubit and get the result \"0\". What is the probability that the $\\textbf{second}$ qubit will be measured as \"0\"?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 2,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        },
+        {
+          "name": "MEASURE"
+        }
+      ],
+      [
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "The two qubits are correlated (indeed, entangled) in the state $\\frac{\\ket{00}+\\ket{11}}{\\sqrt{2}}$. If the first is measured as \"0\" in this circuit, the second will be as well.",
+    "hideResults": true,
+    "hideCircuit": false,
+    "choices": [
+      "0%",
+      "25%",
+      "50%",
+      "75%",
+      "100%"
+    ],
+    "correctChoice": 4
+  },
+  {
+    "id": 7,
+    "title": "Correlation",
+    "description": "Two qubits each start in the state $\\ket{1}$. An $H$ is applied to the first qubit, and then a cNOT is applied with the first qubit as the control and the second as the target. We do not measure the first qubit this time. What is the probability that the $\\textbf{second}$ qubit will be measured as \"0\"?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 2,
+    "nSteps": 4,
+    "circuit": [
+      [
+        {
+          "name": "X"
+        },
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        },
+        null
+      ],
+      [
+        {
+          "name": "X"
+        },
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "name": "MEASURE"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "The two qubits are entangled in the state $\\frac{\\ket{00}-\\ket{11}}{\\sqrt{2}}$, but measuring the second qubit only will produce a random outcome.",
+    "hideResults": true,
+    "hideCircuit": false,
+    "choices": [
+      "0%",
+      "25%",
+      "50%",
+      "75%",
+      "100%"
+    ],
+    "correctChoice": 2
+  },
+  {
+    "id": 11,
+    "title": "Bell States",
+    "description": "We use a CNOT and Hadamard to prepare the state $\\ket{\\Phi^+}=\\frac{\\ket{00}+\\ket{11}}{\\sqrt{2}}$. Two Hadamards are applied to effectively measure in the $+/-$ basis.\n\nIf Alice measures her qubit in the state $\\ket{+}$, what state will Bob measure in the $+/-$ basis?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 2,
+    "nSteps": 5,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        },
+        {
+          "name": "BARRIER",
+          "topWire": 0,
+          "bottomWire": 1
+        },
+        {
+          "name": "H"
+        },
+        {
+          "name": "MEASURE"
+        }
+      ],
+      [
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "name": "BARRIER",
+          "topWire": 0,
+          "bottomWire": 1
+        },
+        {
+          "name": "H"
+        },
+        null
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "$\\ket{\\Phi^+}=\\frac{\\ket{+00}+\\ket{11}}{\\sqrt{2}}=\\frac{\\ket{++}+\\ket{--}}{\\sqrt{2}}$, so if Alice measures $\\ket{+}$, Bob's state will be the same.",
+    "hideResults": false,
+    "hideCircuit": false,
+    "choices": [
+      "$\\ket{+}$",
+      "$\\ket{-}$",
+      "$\\ket{+_i}$",
+      "$\\ket{-_i}$",
+      "Randomly $\\ket{+}$ or $\\ket{-}$"
+    ],
+    "correctChoice": 0
+  },
+  {
+    "id": 9,
+    "title": "Bell states",
+    "description": "What is the output of the below circuit?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 2,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        },
+        null
+      ],
+      [
+        {
+          "name": "X"
+        },
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        },
+        {
+          "name": "X"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 1,
+    "answerCircuit": [
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "",
+    "hideResults": false,
+    "hideCircuit": false,
+    "choices": [
+      "$\\ket{\\Psi^-}=\\frac{\\ket{01}-\\ket{10}}{\\sqrt{2}}$",
+      "$\\ket{\\Psi^+}=\\frac{\\ket{01}+\\ket{10}}{\\sqrt{2}}$",
+      "$\\ket{\\Phi^+}=\\frac{\\ket{00}+\\ket{11}}{\\sqrt{2}}$",
+      "$\\ket{\\Phi^-}=\\frac{\\ket{00}-\\ket{11}}{\\sqrt{2}}$",
+      "$\\ket{11}$"
+    ],
+    "correctChoice": 2
+  },
+  {
+    "id": 10,
+    "title": "Bell states",
+    "description": "What is the output of the circuit below?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 2,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "Z"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        }
+      ],
+      [
+        null,
+        {
+          "name": "X"
+        },
+        {
+          "name": "CNOT",
           "role": "target",
           "controlWire": 0
         }
@@ -32,30 +706,83 @@
     ],
     "exactAnswer": {},
     "answerNQubits": 2,
-    "leftSteps": 1,
-    "rightSteps": 3,
-    "preAnswerCircuit": [
-      [
-        null
-      ],
-      [
-        {
-          "name": "H"
-        }
-      ]
-    ],
+    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "",
+    "hideResults": false,
+    "hideCircuit": false,
+    "choices": [
+      "$\\ket{\\Psi^-}=\\frac{\\ket{01}-\\ket{10}}{\\sqrt{2}}$",
+      "$\\ket{\\Psi^+}=\\frac{\\ket{01}+\\ket{10}}{\\sqrt{2}}$",
+      "$\\ket{\\Phi^+}=\\frac{\\ket{00}+\\ket{11}}{\\sqrt{2}}$",
+      "$\\ket{\\Phi^-}=\\frac{\\ket{00}-\\ket{11}}{\\sqrt{2}}$",
+      "$\\ket{11}$"
+    ],
+    "correctChoice": 0
+  },
+  {
+    "id": 12,
+    "title": "Bell states",
+    "description": "Construct a circuit to generate the state $\\ket{\\Phi^-}=\\frac{\\ket{00}-\\ket{11}}{\\sqrt{2}}$.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z",
+      "CNOT",
+      "I",
+      "T"
+    ],
+    "nQubits": 2,
+    "nSteps": 3,
+    "circuit": [
+      [
         null,
         null,
         null
       ],
+      [
+        null,
+        null,
+        null
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 2,
+    "answerNSteps": 3,
+    "answerCircuit": [
       [
         {
           "name": "H"
         },
+        {
+          "name": "Z"
+        },
+        {
+          "name": "CNOT",
+          "role": "control",
+          "targetWire": 1
+        }
+      ],
+      [
         null,
-        null
+        null,
+        {
+          "name": "CNOT",
+          "role": "target",
+          "controlWire": 0
+        }
       ]
     ],
     "hiddenBlocks": [],
