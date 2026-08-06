@@ -26,9 +26,10 @@
     ],
     "exactAnswer": {},
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -41,7 +42,13 @@
       "The qubit will be in neither state 0 nor state 1",
       "the qubit will remain in state 0 or state 1"
     ],
-    "correctChoice": 1
+    "correctChoice": 1,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
   },
   {
     "id": 7,
@@ -70,9 +77,10 @@
     ],
     "exactAnswer": {},
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -85,12 +93,18 @@
       "Measure the qubit again and then apply an H gate",
       "It is not possible to recover the initial unknown state"
     ],
-    "correctChoice": 3
+    "correctChoice": 3,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
   },
   {
     "id": 1,
     "title": "Qubit measurement",
-    "description": "A qubit starts in the 0 state and then has an H gate applied to it. If we measure the qubit, what is the probability we find it in the state \"0\"?\n\nYou may wish to open the circuit simulator in another window to test the circuit before answering.",
+    "description": "A qubit starts in the 0 state and then has an H gate applied to it. If we measure the qubit, what is the probability we find it in the state \"0\"? \n\nYou may use the histogram panel to the right to help answer this question.",
     "points": 10,
     "questionType": "mcq",
     "restrictToBlanks": true,
@@ -114,9 +128,10 @@
     ],
     "exactAnswer": {},
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -130,12 +145,18 @@
       "Between 51% and 99%",
       "100%"
     ],
-    "correctChoice": 2
+    "correctChoice": 2,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
   },
   {
     "id": 2,
     "title": "Qubit measurement",
-    "description": "A qubit starts in the 0 state and then has two H gates applied to it. If we measure the qubit, what is the probability we find it in the state \"0\"? You may use the histogram on the right panel to help answer this question.\nYou may wish to open the circuit simulator in another window to test the circuit before answering.",
+    "description": "A qubit starts in the 0 state and then has two H gates applied to it. If we measure the qubit, what is the probability we find it in the state \"0\"?\n\nYou may use the histogram on the right panel to help answer this question.",
     "points": 10,
     "questionType": "mcq",
     "restrictToBlanks": true,
@@ -162,9 +183,10 @@
     ],
     "exactAnswer": {},
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -178,12 +200,18 @@
       "Between 51% and 99%",
       "100%"
     ],
-    "correctChoice": 4
+    "correctChoice": 4,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
   },
   {
     "id": 3,
     "title": "Qubit measurement",
-    "description": "A qubit starts in the 0 state and then has two H gates applied to it with one T gate in the middle. If we measure the qubit, what is the probability we find it in the state \"0\"? You may use the histogram on the right panel to help answer this question.\n\nYou may wish to open the circuit simulator in another window to test the circuit before answering.",
+    "description": "A qubit starts in the 0 state and then has two H gates applied to it with one T gate in the middle. If we measure the qubit, what is the probability we find it in the state \"0\"? \n\nYou may use the histogram on the right panel to help answer this question.",
     "points": 10,
     "questionType": "mcq",
     "restrictToBlanks": true,
@@ -213,9 +241,10 @@
     ],
     "exactAnswer": {},
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -229,7 +258,120 @@
       "Between 51% and 99%",
       "100%"
     ],
+    "correctChoice": 3,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
+  },
+  {
+    "id": 11,
+    "title": "Qubit Preparation",
+    "description": "The $Z$ gate introduces a $\\pi$ phase between the $\\ket0$ and $\\ket1$ components.\n\nWhat is the output state of the below circuit?",
+    "points": 10,
+    "questionType": "mcq",
+    "restrictToBlanks": true,
+    "allowedGates": [
+      "H",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "nQubits": 1,
+    "nSteps": 2,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "Z"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "answerCircuit": [
+      [
+        null,
+        null,
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "The Hadamard prepares the state $\\ket{+}$, and the $Z$ flips the phase to prepare the state $\\ket{-}$.",
+    "hideResults": false,
+    "hideCircuit": false,
+    "choices": [
+      "$\\ket0$",
+      "$\\ket1$",
+      "$\\ket{+}$",
+      "$\\ket{-}$"
+    ],
     "correctChoice": 3
+  },
+  {
+    "id": 12,
+    "title": "Qubit Preparation",
+    "description": "The $Y$ gate both flips the $\\ket0$ and $\\ket1$ components as well as adding a $\\pi$ phase between them.\n\nUse exactly two gates to cancel out the $Y$ gate.",
+    "points": 10,
+    "questionType": "circuit",
+    "restrictToBlanks": false,
+    "allowedGates": [
+      "H",
+      "X",
+      "Z",
+      "I"
+    ],
+    "nQubits": 1,
+    "nSteps": 3,
+    "circuit": [
+      [
+        {
+          "name": "H"
+        },
+        {
+          "name": "T"
+        },
+        {
+          "name": "Y"
+        }
+      ]
+    ],
+    "exactAnswer": {},
+    "answerNQubits": 1,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "answerCircuit": [
+      [
+        {
+          "name": "X"
+        },
+        {
+          "name": "Z"
+        },
+        null
+      ]
+    ],
+    "hiddenBlocks": [],
+    "explanation": "$YXZ=-1\\!\\! 1$, which does not affect the qubit state. Intuitively, the $X$ undoes the bit flip and the $Z$ undoes the phase flip.",
+    "hideResults": false,
+    "hideCircuit": false,
+    "choices": [
+      "",
+      ""
+    ],
+    "correctChoice": 0
   },
   {
     "id": 4,
@@ -266,12 +408,15 @@
     ],
     "exactAnswer": {},
     "answerNQubits": 2,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ],
       [
+        null,
+        null,
         null
       ]
     ],
@@ -284,7 +429,14 @@
       "The output states are opposite superposition states",
       "The output states of the circuit are the same"
     ],
-    "correctChoice": 3
+    "correctChoice": 3,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      [],
+      []
+    ],
+    "hideResults": false
   },
   {
     "id": 6,
@@ -317,9 +469,10 @@
     ],
     "exactAnswer": {},
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -334,7 +487,13 @@
       "$\\bra{0}ZHY\\ket{0}$",
       "$\\bra{0}YHZ\\ket{0}$"
     ],
-    "correctChoice": 1
+    "correctChoice": 1,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
   },
   {
     "id": 10,
@@ -374,9 +533,10 @@
       "0_2": "T"
     },
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -387,7 +547,13 @@
       "",
       ""
     ],
-    "correctChoice": 0
+    "correctChoice": 0,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
   },
   {
     "id": 8,
@@ -398,7 +564,8 @@
     "restrictToBlanks": true,
     "allowedGates": [
       "H",
-      "Z"
+      "Z",
+      "I"
     ],
     "nQubits": 1,
     "nSteps": 3,
@@ -424,9 +591,10 @@
       "0_2": "H"
     },
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -437,7 +605,13 @@
       "",
       ""
     ],
-    "correctChoice": 0
+    "correctChoice": 0,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
   },
   {
     "id": 9,
@@ -448,7 +622,8 @@
     "restrictToBlanks": true,
     "allowedGates": [
       "H",
-      "T"
+      "T",
+      "I"
     ],
     "nQubits": 1,
     "nSteps": 6,
@@ -489,9 +664,10 @@
       "0_5": "H"
     },
     "answerNQubits": 1,
-    "answerNSteps": 1,
     "answerCircuit": [
       [
+        null,
+        null,
         null
       ]
     ],
@@ -502,6 +678,12 @@
       "",
       ""
     ],
-    "correctChoice": 0
+    "correctChoice": 0,
+    "leftSteps": 0,
+    "rightSteps": 3,
+    "preAnswerCircuit": [
+      []
+    ],
+    "hideResults": false
   }
 ]
